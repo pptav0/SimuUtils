@@ -5,7 +5,7 @@
 
 **/data
 
-/.git*
+/.github*
 /.DS_Store
 /Manifest.toml
 /docs/Manifest.toml
