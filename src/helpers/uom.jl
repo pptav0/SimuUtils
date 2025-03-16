@@ -106,6 +106,19 @@ function convert(value::T, from_unit, to_unit) where {T<:Number}
 end
 
 # Conversion functions
+"""
+	convert(value::T, from_unit::U, to_unit::U) where {T<:Number, U}
+
+Convert a value from one unit of measure to another.
+
+# Arguments
+- `value::T`: The value to convert.
+- `from_unit::U`: The unit of measure to convert from.
+- `to_unit::U`: The unit of measure to convert to.
+
+# Returns
+- `T`: The converted value.
+"""
 function convert(value::T, from_unit::U, to_unit::U) where {T<:Number, U}
     if from_unit == to_unit
         return value
@@ -120,6 +133,18 @@ function convert(value::T, from_unit::U, to_unit::U) where {T<:Number, U}
     return value * factor
 end
 
+"""
+	convert(uom::Uom{T, U}, to_unit::U) where {T, U}
+
+Convert a Uom struct from one unit of measure to another.
+
+# Arguments
+- `uom::Uom{T, U}`: The Uom struct to convert.
+- `to_unit::U`: The unit of measure to convert to.
+
+# Returns
+- `Uom{T, U}`: The converted Uom struct.
+"""
 function convert(uom::Uom{T, U}, to_unit::U) where {T, U}
     new_value = convert(uom.value, uom.unit, to_unit)
     return Uom{T, U}(new_value, to_unit)
