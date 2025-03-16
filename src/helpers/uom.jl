@@ -1,6 +1,3 @@
-# Import necessary functions from Base to extend them
-import Base: +, -, *, /
-
 # Unit of measure definitions
 abstract type Unit end
 
@@ -40,7 +37,7 @@ end
 #
 # The UOM struct is used to define the unit of measure for a given quantity.
 # It is a parametric type that takes two type parameters: T and U. T is the
-struct Uom{T, U<:Unit}
+struct Uom{T, U}
     value::T
     unit::U
 end
@@ -87,7 +84,7 @@ const UOM_CONVERSIONS = Dict(
     (FT_MIN, FT_S) => 1 / 60.0,
 )
 
-# Conversion functions
+# Catch-all method to handle invalid conversions
 """
 	convert(value::T, from_unit::U, to_unit::U) where {T<:Number, U<:Unit}
 
@@ -101,39 +98,50 @@ Convert a value from one unit of measure to another.
 # Returns
 - `T`: The converted value.
 """
-function convert(value::T, from_unit::U, to_unit::U) where {T<:Number, U<:Unit}
+function convert(value::T, from_unit, to_unit) where {T<:Number}
+    throw(ArgumentError("""
+		Conversion from $from_unit to $to_unit is not defined or
+	    units are not compatible.
+    """))
+end
+
+# Conversion functions
+function convert(value::T, from_unit::U, to_unit::U) where {T<:Number, U}
     if from_unit == to_unit
         return value
     end
     factor = get(UOM_CONVERSIONS, (from_unit, to_unit), nothing)
     if factor === nothing
         throw(ArgumentError("""
-        	Conversion from $from_unit to $to_unit is not defined or
-	        units are not compatible.
-		"""))
+         	Conversion from $from_unit to $to_unit is not defined or
+          	units are not compatible.
+        """))
     end
     return value * factor
 end
 
-function convert(uom::Uom{T, U}, to_unit::U) where {T, U<:Unit}
-	new_value = convert(uom.value, uom.unit, to_unit)
-	return Uom{T, U}(new_value, to_unit)
+function convert(uom::Uom{T, U}, to_unit::U) where {T, U}
+    new_value = convert(uom.value, uom.unit, to_unit)
+    return Uom{T, U}(new_value, to_unit)
 end
 
-function +(uom1::Uom{T, U}, uom2::Uom{T, U}) where {T, U<:Unit}
+# Arithmetic operations
+import Base: +, -, *, /
+
+function +(uom1::Uom{T, U}, uom2::Uom{T, U}) where {T, U}
 	uom2_converted = convert(uom2, uom1.unit)
 	return Uom{T, U}(uom1.value + uom2_converted.value, uom1.unit)
 end
 
-function -(uom1::Uom{T, U}, uom2::Uom{T, U}) where {T, U<:Unit}
+function -(uom1::Uom{T, U}, uom2::Uom{T, U}) where {T, U}
 	uom2_converted = convert(uom2, uom1.unit)
 	return Uom{T, U}(uom1.value - uom2_converted.value, uom1.unit)
 end
 
-function *(uom::Uom{T, U}, scalar::T) where {T, U<:Unit}
+function *(uom::Uom{T, U}, scalar::T) where {T, U}
 	return Uom{T, U}(uom.value * scalar, uom.unit)
 end
 
-function /(uom::Uom{T, U}, scalar::T) where {T, U<:Unit}
+function /(uom::Uom{T, U}, scalar::T) where {T, U}
 	return Uom{T, U}(uom.value / scalar, uom.unit)
 end
