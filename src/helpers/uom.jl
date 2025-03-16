@@ -43,13 +43,22 @@ struct Uom{T, U}
 end
 
 # Conversion factors
+# Define conversion factors between different units of measure
+
 """
 	UOM_CONVERSIONS
 
 A dictionary of conversion factors between different units of measure.
 """
 const UOM_CONVERSIONS = Dict(
-	# volume
+    VOLUME_CONVERSIONS...,
+    LENGTH_CONVERSIONS...,
+    RATE_CONVERSIONS...,
+    MASS_CONVERSIONS...,
+    VELOCITY_CONVERSIONS...
+)
+
+const VOLUME_CONVERSIONS = Dict(
     (BBL, M3) => 0.159,
     (BBL, FT3) => 0.159 / 0.3048^3,
     (BBL, GAL) => 42.0,
@@ -61,30 +70,40 @@ const UOM_CONVERSIONS = Dict(
     (FT3, GAL) =>  0.3048^3 * 1_000 / 3.785,
     (GAL, BBL) => 1 / 42.0,
     (GAL, M3) => 3.785 / 1_000,
-    (GAL, FT3) => 3.785 / (1_000 * 0.3048^3),
-    # length
+    (GAL, FT3) => 3.785 / (1_000 * 0.3048^3)
+)
+
+const LENGTH_CONVERSIONS = Dict(
     (M, FT) => 1 / 0.3048,
     (M, IN) => 1 / 0.0254,
     (FT, M) => 0.3048,
     (FT, IN) => 12.0,
     (IN, M) => 0.0254,
-    (IN, FT) => 1 / 12.0,
-    # rate
+    (IN, FT) => 1 / 12.0
+)
+
+const RATE_CONVERSIONS = Dict(
     (BPM, M3MIN) => 0.159,
     (M3MIN, BPM) => 1 / 0.159,
     (BPM, LPM) => 42.0 / 3.785,
-    (LPM, BPM) => 3.785 / 42.0,
-    # mass
+    (LPM, BPM) => 3.785 / 42.0
+)
+
+const MASS_CONVERSIONS = Dict(
     (KG, LB) => 1 / 0.454,
-    (LB, KG) => 0.454,
-    # velocity
+    (LB, KG) => 0.454
+)
+
+const VELOCITY_CONVERSIONS = Dict(
     (FT_S, FT_MIN) => 60.0,
     (FT_S, M_S) => 0.3048,
     (FT_S, M_MIN) => 0.3048 * 60.0,
-    (FT_MIN, FT_S) => 1 / 60.0,
+    (FT_MIN, FT_S) => 1 / 60.0
 )
 
 # Catch-all method to handle invalid conversions
+# This method will be called if no other method matches the arguments
+
 """
 	convert(value::T, from_unit::U, to_unit::U) where {T<:Number, U<:Unit}
 
@@ -106,6 +125,8 @@ function convert(value::T, from_unit, to_unit) where {T<:Number}
 end
 
 # Conversion functions
+# These methods are defined for specific unit conversions
+
 """
 	convert(value::T, from_unit::U, to_unit::U) where {T<:Number, U}
 
@@ -151,6 +172,8 @@ function convert(uom::Uom{T, U}, to_unit::U) where {T, U}
 end
 
 # Arithmetic operations
+# Define arithmetic operations for Uom struct
+
 import Base: +, -, *, /
 
 function +(uom1::Uom{T, U}, uom2::Uom{T, U}) where {T, U}
