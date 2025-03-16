@@ -1,6 +1,12 @@
 *.jl.*.cov
 *.jl.cov
 *.jl.mem
+*.env
+
+**/data
+
+/.git*
+/.DS_Store
 /Manifest.toml
 /docs/Manifest.toml
 /docs/build/
