@@ -45,19 +45,6 @@ end
 # Conversion factors
 # Define conversion factors between different units of measure
 
-"""
-	UOM_CONVERSIONS
-
-A dictionary of conversion factors between different units of measure.
-"""
-const UOM_CONVERSIONS = Dict(
-    VOLUME_CONVERSIONS...,
-    LENGTH_CONVERSIONS...,
-    RATE_CONVERSIONS...,
-    MASS_CONVERSIONS...,
-    VELOCITY_CONVERSIONS...
-)
-
 const VOLUME_CONVERSIONS = Dict(
     (BBL, M3) => 0.159,
     (BBL, FT3) => 0.159 / 0.3048^3,
@@ -99,6 +86,19 @@ const VELOCITY_CONVERSIONS = Dict(
     (FT_S, M_S) => 0.3048,
     (FT_S, M_MIN) => 0.3048 * 60.0,
     (FT_MIN, FT_S) => 1 / 60.0
+)
+
+"""
+	UOM_CONVERSIONS
+
+A dictionary of conversion factors between different units of measure.
+"""
+const UOM_CONVERSIONS = Dict(
+    VOLUME_CONVERSIONS...,
+    LENGTH_CONVERSIONS...,
+    RATE_CONVERSIONS...,
+    MASS_CONVERSIONS...,
+    VELOCITY_CONVERSIONS...
 )
 
 # Catch-all method to handle invalid conversions
