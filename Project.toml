@@ -1,0 +1,13 @@
+name = "SimuUtils"
+uuid = "9b1f8a3a-8b6a-4175-97a6-29460d62f867"
+authors = ["Jose Guzman <pepetavo@pm.me> and contributors"]
+version = "0.1.0"
+
+[compat]
+julia = "1.11"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
