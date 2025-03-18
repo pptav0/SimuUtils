@@ -1,6 +1,7 @@
 module SimuUtils
 
 using Printf
+using LaTeXStrings
 
 # Include all  functions
 include("helpers/numeric.jl");

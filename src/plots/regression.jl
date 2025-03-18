@@ -1,7 +1,10 @@
 # modules
+# using WGLMakie;
 using CairoMakie;
 
 """
+	linear_regression(X::Vector{Float64}, Y::Vector{Float64})
+
     plot_regression(
 		X_exp::Vector{Float64}, Y_exp::Vector{Float64},
 		X_fit::Vector{Float64}, Y_fit::Vector{Float64},
@@ -32,12 +35,12 @@ function plot_regression(
     X_exp::Vector{Float64}, Y_exp::Vector{Float64},
     X_fit::Vector{Float64}, Y_fit::Vector{Float64},
     regression_type::Symbol;
-    title::String="Regression Plot", xlabel::String="x-axis", ylabel::String="y-axis",
-    annotations::Dict{String,Float64}=Dict(), figres=(450, 300),
-    label_fit_model::String="Fitted Model"
+    title::AbstractString="Regression Plot", xlabel::AbstractString="x-axis", ylabel::AbstractString="y-axis",
+    annotations::Dict{AbstractString,Float64}=Dict(), figres=(450, 300),
+    label_fit_model::AbstractString="Fitted Model"
 )
     # Create the plot
-    fig = Figure(; size=figres, fontsize=10)
+    fig = Figure(; size=figres, fontsize=12)
     ax = Axis(fig[1, 1], title=title, xlabel=xlabel, ylabel=ylabel)
 
     # Plot experimental points
@@ -70,7 +73,7 @@ function plot_regression(
             ax, x_pos, y_pos - (i - 1) * 0.05 * (maximum(Y_fit) - minimum(Y_fit)),
             text=@sprintf("%s = %.4f", key, value),
             color=:purple, align=(:right, :bottom),
-            font="sans-serif", fontsize=8
+            font="sans-serif", fontsize=12
         )
     end
 
@@ -78,5 +81,6 @@ function plot_regression(
     axislegend(ax, position=:lt)
 
     # Display the plot
-    display(fig)
+    # display(fig)
+    return fig
 end
