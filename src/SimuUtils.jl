@@ -10,6 +10,6 @@ include("geometry/area.jl");
 include("plots/regression.jl");
 
 # export functions
-export round_to, area_circle, convert, plot_regression;
+export round_to, area_circle, convert, plot_regression, calculate_r_squared;
 
 end
