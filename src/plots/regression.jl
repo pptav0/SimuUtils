@@ -24,7 +24,8 @@ function plot_regression(
 		X_exp::Vector{Float64}, Y_exp::Vector{Float64},
 		X_fit::Vector{Float64}, Y_fit::Vector{Float64},
 		regression_type::Symbol;
-		title::String="Regression Plot", xlabel::String="x-axis", ylabel::String="y-axis"
+		title::String="Regression Plot", xlabel::String="x-axis", ylabel::String="y-axis",
+		annotations::Dict{String, Float64}=Dict()
 	)
     # Create the plot
     fig = Figure(resolution = (600, 400))
@@ -46,6 +47,19 @@ function plot_regression(
 
     # Plot fitted model data
     lines!(ax, X_fit, Y_fit, color = :purple, linestyle = :solid, label = "Fitted Model")
+
+    # Calculate the position for the annotations (bottom right)
+    x_pos = maximum(X_fit)
+    y_pos = minimum(Y_fit)
+    # Add annotations
+    for (i, (key, value)) in enumerate(annotations)
+        text!(
+        	ax, x_pos, y_pos - (i-1) * 0.05 * (maximum(Y_fit) - minimum(Y_fit)),
+         	text = "$key = $(round(value, digits=4))",
+          	color = :purple, align = (:right, :bottom),
+           	font = "sans-serif", fontsize = 8
+        )
+    end
 
     # Add legend
     axislegend(ax, position = :lt)
