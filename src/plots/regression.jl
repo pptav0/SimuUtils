@@ -1,47 +1,54 @@
-using CairoMakie
+# modules
+using CairoMakie;
 
 """
-	plot_regression(X::Vector{Float64}, Y::Vector{Float64})
+    plot_regression(
+		X_exp, Y_exp, X_fit, Y_fit, regression_type::Symbol;
+		title = "Regression Plot", xlabel = "x-axis", ylabel = "y-axis"
+	)
 
-	This function plots the experimental data points along with
-	the linear and non-linear regression lines.
+    This function plots the experimental data points along with
+    the fitted model data using linear or non-linear regression.
 
 # Arguments
-- `X::Vector{Float64}`: The X-axis data.
-- `Y::Vector{Float64}`: The Y-axis data.
+- `X_exp::Vector{Float64}`: The X-axis experimental data.
+- `Y_exp::Vector{Float64}`: The Y-axis experimental data.
+- `X_fit::Vector{Float64}`: The X-axis fitted model data.
+- `Y_fit::Vector{Float64}`: The Y-axis fitted model data.
+- `regression_type::Symbol`: The type of regression to use (:linear or :non_linear).
 
 # Returns
 - `Nothing`
 """
-function plot_regression(X, Y)
-    # Calculate linear regression
-    slope, intercept = linear_regression(X, Y)
-    linear_fit = X -> slope * X + intercept
-
-    # Calculate non-linear regression (quadratic)
-    coeffs = non_linear_regression(X, Y)
-    non_linear_fit = X -> coeffs[1] + coeffs[2] * X + coeffs[3] * X^2
-
+function plot_regression(
+		X_exp::Vector{Float64}, Y_exp::Vector{Float64},
+		X_fit::Vector{Float64}, Y_fit::Vector{Float64},
+		regression_type::Symbol;
+		title::String="Regression Plot", xlabel::String="x-axis", ylabel::String="y-axis"
+	)
     # Create the plot
     fig = Figure(resolution = (600, 400))
-    ax = Axis(fig[1, 1], title = "Regression Plot", xlabel = "X", ylabel = "Y")
+    ax = Axis(fig[1, 1], title=title, xlabel=xlabel, ylabel=ylabel)
 
     # Plot experimental points
-    scatter!(ax, X, Y, color = :blue, label = "Experimental Points")
+    scatter!(ax, X_exp, Y_exp, color = :blue, label = "Experimental Points")
 
-    # Plot linear regression line
-    linear_X = range(minimum(X), stop = maximum(X), length = 100)
-    linear_Y = linear_fit.(linear_X)
-    lines!(ax, linear_X, linear_Y, color = :green, linestyle = :dash, label = "linear Regression")
+    # Perform regression fitting
+    if regression_type == :linear
+        slope, intercept = linear_regression(X_exp, Y_exp)
+        fit_Y = slope .* X_fit .+ intercept
+        lines!(ax, X_fit, fit_Y, color = :red, linestyle = :dash, label = "Linear Fit")
+    elseif regression_type == :non_linear
+        coeffs = non_linear_regression(X_exp, Y_exp)
+        fit_Y = coeffs[1] .+ coeffs[2] .* X_fit .+ coeffs[3] .* X_fit .^ 2
+        lines!(ax, X_fit, fit_Y, color = :green, linestyle = :dash, label = "Non-Linear Fit")
+    end
 
-    # Plot non-linear regression line
-    non_linear_X = range(minimum(X), stop = maximum(X), length = 100)
-    non_linear_Y = non_linear_fit.(non_linear_X)
-    lines!(ax, non_linear_X, non_linear_Y, color = :red, label = "Non-Linear Regression")
-
+    # Plot fitted model data
+    lines!(ax, X_fit, Y_fit, color = :purple, linestyle = :solid, label = "Fitted Model")
 
     # Add legend
-    axislegend(ax, position = :rt)
+    axislegend(ax, position = :lt)
 
     # Display the plot
     display(fig)
