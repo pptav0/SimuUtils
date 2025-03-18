@@ -1,5 +1,7 @@
 module SimuUtils
 
+using Printf
+
 # Include all  functions
 include("helpers/numeric.jl");
 include("helpers/uom.jl");

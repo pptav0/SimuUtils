@@ -66,11 +66,11 @@ function plot_regression(
     y_pos = minimum(Y_fit)
     # Add annotations
     for (i, (key, value)) in enumerate(annotations)
-        text!(
-        	ax, x_pos, y_pos - (i-1) * 0.05 * (maximum(Y_fit) - minimum(Y_fit)),
-         	text = "$key = $(round(value, digits=4))",
-          	color = :purple, align = (:right, :bottom),
-           	font = "sans-serif", fontsize = 8
+    	text!(
+            ax, x_pos, y_pos - (i-1) * 0.05 * (maximum(Y_fit) - minimum(Y_fit)),
+            text = @sprintf("%s = %.4f", key, value),
+            color = :purple, align = (:right, :bottom),
+            font = "sans-serif", fontsize = 8
         )
     end
 
