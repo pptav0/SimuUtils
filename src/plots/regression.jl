@@ -35,7 +35,8 @@ function plot_regression(
     X_exp::Vector{Float64}, Y_exp::Vector{Float64},
     X_fit::Vector{Float64}, Y_fit::Vector{Float64},
     regression_type::Symbol;
-    title::AbstractString="Regression Plot", xlabel::AbstractString="x-axis", ylabel::AbstractString="y-axis",
+    title::AbstractString="Regression Plot",
+    xlabel::AbstractString="x-axis", ylabel::AbstractString="y-axis",
     annotations::Dict{AbstractString,Float64}=Dict(), figres=(450, 300),
     label_fit_model::AbstractString="Fitted Model"
 )
@@ -79,8 +80,5 @@ function plot_regression(
 
     # Add legend
     axislegend(ax, position=:lt)
-
-    # Display the plot
-    # display(fig)
     return fig
 end
