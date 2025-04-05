@@ -2,34 +2,39 @@
 abstract type Unit end
 
 @enum VolumeUnit begin
-    BBL  # Barrels
-    M3   # Cubic meters
-    FT3  # Cubic feet
-    GAL  # Gallons
+    BBL  	# Barrels
+    M3   	# Cubic meters
+    FT3  	# Cubic feet
+    GAL  	# Gallons
+end
+
+@enum DiameterUnit begin
+    IN   	# Inches
+    MM 		# Millimeters
 end
 
 @enum LengthUnit begin
-    M    # Meters
-    FT   # Feet
-    IN   # Inches
+    M    	# Meters
+    FT   	# Feet
+    # IN   	# Inches
 end
 
 @enum RateUnit begin
-    BPM  # Barrels per minute
-    M3MIN  # Cubic meters per minute
-    LPM  # Liters per minute
+    BPM  	# Barrels per minute
+    M3MIN  	# Cubic meters per minute
+    LPM  	# Liters per minute
 end
 
 @enum VelocityUnit begin
-    FT_S  # Feet per second
+    FT_S  	# Feet per second
     FT_MIN  # Feet per minute
-    M_S  # Meters per second
-    M_MIN  # Meters per minute
+    M_S  	# Meters per second
+    M_MIN  	# Meters per minute
 end
 
 @enum MassUnit begin
-    KG  # Kilograms
-    LB  # Pounds
+    KG  	# Kilograms
+    LB  	# Pounds
 end
 
 
