@@ -27,6 +27,7 @@ using CairoMakie;
 - `ylabel`: 		The label for the y-axis.
 - `annotations`: 	The annotations to display on the plot.
 - `figres`: 		The resolution of the figure.
+- `scale`:          Define the scale of Axis (e.g. idenntitiy, log10, log2)
 
 # Returns
 - `Nothing`
@@ -37,12 +38,16 @@ function plot_regression(
     regression_type::Symbol;
     title::AbstractString="Regression Plot",
     xlabel::AbstractString="x-axis", ylabel::AbstractString="y-axis",
-    annotations::Dict{AbstractString,Float64}=Dict(), figres=(450, 300),
-    label_fit_model::AbstractString="Fitted Model"
+    annotations::Dict{AbstractString,Float64}=Dict(), figres=(640, 400),
+    label_fit_model::AbstractString="Fitted Model",
+    scale=identity,
 )
     # Create the plot
     fig = Figure(; size=figres, fontsize=12)
-    ax = Axis(fig[1, 1], title=title, xlabel=xlabel, ylabel=ylabel)
+    ax = Axis(
+        fig[1, 1], xscale=scale, yscale=scale,
+        title=title, xlabel=xlabel, ylabel=ylabel
+    );
 
     # Plot experimental points
     scatter!(ax, X_exp, Y_exp, color=:blue, label="Experimental Points")
