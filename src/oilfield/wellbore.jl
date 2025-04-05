@@ -10,8 +10,9 @@ include("./casings.jl")
 
 # Helper functions
 
-function draw_casing_section!(ax, section::Casing, top::Float64, color, alpha)
+function draw_casing_section!(ax, section::Casing, color, alpha)
     # Section params
+    top = section.hanger[1]
 	bottom = section.depth[1]
     right_outer = section.od[1] / 2
     left_outer = -right_outer
@@ -50,11 +51,13 @@ function plot_well_schem(
 		units::LengthUnit=M::LengthUnit)
 
     # Prepare depths
-    total_depth = maximum([g.depth[1] for g in outer_geometry if g !== nothing])
-    offshore_offset = 0.0
-
-    if airgap !== nothing && water_depth !== nothing
-        offshore_offset = airgap + water_depth
+    total_depth = maximum([
+    	maximum([g.depth[1] for g in inner_geometry if g !== nothing]),
+    	maximum([g.depth[1] for g in outer_geometry if g !== nothing]) ])
+    offshore_offset = if airgap !== nothing && water_depth !== nothing
+        airgap + water_depth
+    else
+    	0.0
     end
 
     # Set up the figure
@@ -67,25 +70,41 @@ function plot_well_schem(
 
     # Helper to draw casing as filled rectangles (outer and inner)
     function draw_casing!(geom, color, alpha)
-        top = 0.0
+        top, bottom = 0.0, 0.0
+        hanger, overlap = 0.0, 0.0
         prev_left_inner = nothing
         prev_right_inner = nothing
         for section in geom
-            bottom, left, right = draw_casing_section!(ax, section, top, color, alpha)
-            if prev_left_inner !== nothing
+        	# Adjust top position based on hanger
+            if section.hanger !== nothing && section.hanger[1] > hanger
+                overlap = bottom - section.hanger[1]
+            end
+            hanger = section.hanger[1]
+
+            # Draw casing section
+            bottom, left, right = draw_casing_section!(ax, section, color, alpha)
+
+            if prev_left_inner !== nothing && overlap > 0.0
                 # Draw connecting line from previous left ID to current left OD
                 lines!(ax,
-                        [prev_left_inner, left[1]],
-                        [top, top], color=color, alpha=alpha, linewidth=3)
+                        [prev_left_inner, left[2]],
+                        [top, top - overlap], color=color, alpha=alpha, linewidth=3)
+                lines!(ax,
+                        [left[2], prev_left_inner],
+                        [top, top - overlap], color=color, alpha=alpha, linewidth=3)
             end
-            if prev_right_inner !== nothing
+
+            if prev_right_inner !== nothing && overlap > 0.0
                 # Draw connecting line from previous right ID to current right OD
                 lines!(ax,
-                        [prev_right_inner, right[1]],
-                        [top, top], color=color, alpha=alpha, linewidth=3)
+                        [prev_right_inner, right[2]],
+                        [top, top - overlap], color=color, alpha=alpha, linewidth=3)
+                lines!(ax,
+                        [right[2], prev_right_inner],
+                        [top, top - overlap], color=color, alpha=alpha, linewidth=3)
             end
-            prev_left_inner = left[2]
-            prev_right_inner = right[2]
+            prev_left_inner = left[1]
+            prev_right_inner = right[1]
             top = bottom
         end
     end

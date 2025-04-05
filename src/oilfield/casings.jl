@@ -113,6 +113,7 @@ mutable struct Casing{T<:Float64}
 	od::Tuple{T, DiameterUnit}
 	id::Tuple{T, DiameterUnit}
 	wt::Tuple{T, CsgWeight}
+	hanger::Union{Nothing, Tuple{T, LengthUnit}}
 	depth::Union{Nothing, Tuple{T, LengthUnit}}
 	thread::Union{Nothing, Thread}
 	grade::Union{Nothing, String}
@@ -123,6 +124,7 @@ end
 """
 	Casing(
 		od::T, id::T, units::DiameterUnit=IN::DiameterUnit;
+		hanger::Union{Nothing, Tuple{T, LengthUnit}}=nothing,
 		depth::Union{Nothing, Tuple{T, LengthUnit}}=nothing) where T<:Union{Float64, Float32}
 
 Constructor given `od` and `id` inputs. `depth` and other `Casing` properties are optional.
@@ -138,18 +140,23 @@ Constructor given `od` and `id` inputs. `depth` and other `Casing` properties ar
 """
 function Casing(
 	od::T, id::T, units::DiameterUnit=IN::DiameterUnit;
+	hanger::Union{Nothing, Tuple{T, LengthUnit}}=nothing,
 	depth::Union{Nothing, Tuple{T, LengthUnit}}=nothing) where T<:Union{Float64, Float32}
 
-	# Asser OD is larger than ID
+	# Assert Inputs diameters and depths
 	if od <= id
 		thread("Outer diameter must be larger than inner diameter")
+	end
+	if hanger[1] > depth[1]
+		thread("Hanger cannot be deeper than Casing depth")
 	end
 
 	# Calculate the wall thickness of the casing
 	wt = calc_casing_weight(od, id, units)
 
 	Casing{T}(
-		(od, units), (id, units), (wt, PPF::CsgWeight), depth,
+		(od, units), (id, units), (wt, PPF::CsgWeight),
+		hanger, depth,
 		nothing, nothing, nothing, nothing,
 	)
 end
