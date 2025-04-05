@@ -7,6 +7,33 @@ Makie.set_theme!(ggthemr(:fresh))
 # functions
 include("./casings.jl")
 
+
+# Helper functions
+
+function draw_casing_section!(ax, section::Casing, top::Float64, color, alpha)
+    # Section params
+	bottom = section.depth[1]
+    right_outer = section.od[1] / 2
+    left_outer = -right_outer
+    right_inner = section.id[1] / 2
+    left_inner = -right_inner
+    label = "$(section.od[1])"
+
+    # Draw outer wall
+    rect_outer = [Point2f(left_outer, top), Point2f(right_outer, top),
+                  Point2f(right_outer, bottom), Point2f(left_outer, bottom)]
+    poly!(ax, rect_outer, color=color, transparency=true, alpha=alpha, label=label)
+
+    # Draw inner wall
+    rect_inner = [Point2f(left_inner, top), Point2f(right_inner, top),
+                  Point2f(right_inner, bottom), Point2f(left_inner, bottom)]
+    poly!(ax, rect_inner, color=:white, transparency=true, alpha=1.0)
+
+    return bottom, (left_inner, left_outer), (right_inner, right_outer)
+end
+
+# Wellbore construction
+
 """
     plot_well_schem(;
 		outer_geometry::Vector{Casing},
@@ -41,14 +68,24 @@ function plot_well_schem(
     # Helper to draw casing as filled rectangles (outer and inner)
     function draw_casing!(geom, color, alpha)
         top = 0.0
+        prev_left_inner = nothing
+        prev_right_inner = nothing
         for section in geom
-            bottom = section.depth[1]
-            label = "$(section.od[1])"
-            right = section.od[1] / 2
-            left = -right
-            rect = [Point2f(left, top), Point2f(right, top),
-                    Point2f(right, bottom), Point2f(left, bottom)]
-            poly!(ax, rect, color=color, transparency=true, alpha=alpha, label=label)
+            bottom, left, right = draw_casing_section!(ax, section, top, color, alpha)
+            if prev_left_inner !== nothing
+                # Draw connecting line from previous left ID to current left OD
+                lines!(ax,
+                        [prev_left_inner, left[1]],
+                        [top, top], color=color, alpha=alpha, linewidth=3)
+            end
+            if prev_right_inner !== nothing
+                # Draw connecting line from previous right ID to current right OD
+                lines!(ax,
+                        [prev_right_inner, right[1]],
+                        [top, top], color=color, alpha=alpha, linewidth=3)
+            end
+            prev_left_inner = left[2]
+            prev_right_inner = right[2]
             top = bottom
         end
     end
