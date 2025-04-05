@@ -145,10 +145,10 @@ function Casing(
 
 	# Assert Inputs diameters and depths
 	if od <= id
-		thread("Outer diameter must be larger than inner diameter")
+		throw(ArgumentError("Outer diameter must be larger than inner diameter"))
 	end
 	if hanger[1] > depth[1]
-		thread("Hanger cannot be deeper than Casing depth")
+		throw(ArgumentError("Hanger cannot be deeper than Casing depth"))
 	end
 
 	# Calculate the wall thickness of the casing
