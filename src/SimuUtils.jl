@@ -11,14 +11,15 @@ include("helpers/regression.jl");
 include("geometry/area.jl");
 
 # include Oilfield module
-include("oilfield/casings.jl");
+include("oilfield/wellbore.jl");
+# include("oilfield/casings.jl");
 
 # include plots functions
 include("plots/regression.jl");
 
 # export functions
 export round_to, area_circle, convert,
-		Casing,
+		Casing, plot_well_schem,
 		plot_regression, calculate_r_squared;
 
 end
