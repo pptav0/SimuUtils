@@ -31,10 +31,11 @@ function plot_well_schem(
     end
 
     # Set up the figure
+    uom = lowercase("$units")
     fig = Figure(; size=(600, 800))
     ax = Axis(
     	fig[1, 1],
-     	xlabel="Casing Radius (in)", ylabel="Depth ($units)",
+     	xlabel="Casing Radius (in)", ylabel="Depth ($uom)",
         yreversed=true)
 
     # Helper to draw casing as filled rectangles (outer and inner)
