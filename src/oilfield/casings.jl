@@ -1,5 +1,3 @@
-using NamedTuples
-
 # ----------------------------------------
 #
 # 	* Defined datatypes
@@ -7,7 +5,7 @@ using NamedTuples
 # ----------------------------------------
 
 @enum CsgWeight begin
-    PPF  	# lb/ft
+    PPF  # lb/ft
 end
 
 const STEEL_DENSITY = 490.0 # lb/ft^3
@@ -20,7 +18,7 @@ const STEEL_DENSITY = 490.0 # lb/ft^3
 # ----------------------------------------
 
 # Function to convert diameter to feet
-function to_feet(diameter::T, unit::DiameterUnit) where T<:Union{Float64, Float32}
+function to_feet(diameter::T, unit::DiameterUnit) where {T<:Union{Float64,Float32}}
     if unit == IN::DiameterUnit
         return diameter / 12.0
     elseif unit == MM::DiameterUnit
@@ -31,7 +29,7 @@ function to_feet(diameter::T, unit::DiameterUnit) where T<:Union{Float64, Float3
 end
 
 # Function to convert diameter from feet to the original unit
-function from_feet(diameter_ft::T, unit::DiameterUnit) where T<:Union{Float64, Float32}
+function from_feet(diameter_ft::T, unit::DiameterUnit) where {T<:Union{Float64,Float32}}
     if unit == IN::DiameterUnit
         return diameter_ft * 12.0
     elseif unit == MM::DiameterUnit
@@ -57,8 +55,8 @@ Function to calculate the weight of the casing in ppf (lb/ft)
    - `weight_ppf::T`: The weight of the casing in lb/ft.
 """
 function calc_casing_weight(
-	od::T, id::T, unit::DiameterUnit;
-	material::T=STEEL_DENSITY) where T<:Union{Float64, Float32}
+    od::T, id::T, unit::DiameterUnit;
+    material::T=STEEL_DENSITY) where {T<:Union{Float64,Float32}}
 
     # Convert od and id to feet
     od_ft = to_feet(od, unit)
@@ -88,13 +86,13 @@ Function to calculate the inner diameter of the casing given the outer diameter 
 """
 function calc_casing_id(
     od::T, weight_ppf::T, unit::DiameterUnit;
-    material::T=STEEL_DENSITY) where T<:Union{Float64, Float32}
+    material::T=STEEL_DENSITY) where {T<:Union{Float64,Float32}}
 
     # Convert od to feet
     od_ft = to_feet(od, unit)
 
     # Calculate id in feet
-    id_ft = sqrt( od_ft^2 - ((4 / π) * (weight_ppf/ material)) )
+    id_ft = sqrt(od_ft^2 - ((4 / π) * (weight_ppf / material)))
 
     # Convert id back to the original unit
     return round(from_feet(id_ft, unit), digits=3)
@@ -107,20 +105,20 @@ end
 # ----------------------------------------
 
 struct Thread{T<:Float64}
-	name::String
-	yield::T
+    name::String
+    yield::T
 end
 
 mutable struct Casing{T<:Float64}
-	od::Tuple{T, DiameterUnit}
-	id::Tuple{T, DiameterUnit}
-	wt::Tuple{T, CsgWeight}
-	hanger::Union{Nothing, Tuple{T, LengthUnit}}
-	depth::Union{Nothing, Tuple{T, LengthUnit}}
-	thread::Union{Nothing, Thread}
-	grade::Union{Nothing, String}
-	burst::Union{Nothing, T}
-	collapse::Union{Nothing, T}
+    od::Tuple{T,DiameterUnit}
+    id::Tuple{T,DiameterUnit}
+    wt::Tuple{T,CsgWeight}
+    hanger::Union{Nothing,Tuple{T,LengthUnit}}
+    depth::Union{Nothing,Tuple{T,LengthUnit}}
+    thread::Union{Nothing,Thread}
+    grade::Union{Nothing,String}
+    burst::Union{Nothing,T}
+    collapse::Union{Nothing,T}
 end
 
 """
@@ -141,50 +139,77 @@ Constructor given `od` and `id` inputs. `depth` and other `Casing` properties ar
 - `Casing{T}`: The constructed `Casing` object.
 """
 function Casing(
-	od::T, id::T, units::DiameterUnit=IN::DiameterUnit;
-	hanger::Union{Nothing, Tuple{T, LengthUnit}}=nothing,
-	depth::Union{Nothing, Tuple{T, LengthUnit}}=nothing) where T<:Union{Float64, Float32}
+    od::T, id::T, units::DiameterUnit=IN::DiameterUnit;
+    hanger::Union{Nothing,Tuple{T,LengthUnit}}=nothing,
+    depth::Union{Nothing,Tuple{T,LengthUnit}}=nothing) where {T<:Union{Float64,Float32}}
 
-	# Assert Inputs diameters and depths
-	if od <= id
-		throw(ArgumentError("Outer diameter must be larger than inner diameter"))
-	end
-	if !isnothing(hanger) && !isnothing(depth) && hanger[1] > depth[1]
-		throw(ArgumentError("Hanger cannot be deeper than Casing depth"))
-	end
+    # Assert Inputs diameters and depths
+    if od <= id
+        throw(ArgumentError("Outer diameter must be larger than inner diameter"))
+    end
+    if !isnothing(hanger) && !isnothing(depth) && hanger[1] > depth[1]
+        throw(ArgumentError("Hanger cannot be deeper than Casing depth"))
+    end
 
-	# Calculate the wall thickness of the casing
-	wt = calc_casing_weight(od, id, units)
+    # Calculate the wall thickness of the casing
+    wt = calc_casing_weight(od, id, units)
 
-	Casing{T}(
-		(od, units), (id, units), (wt, PPF::CsgWeight),
-		hanger, depth,
-		nothing, nothing, nothing, nothing,
-	)
+    Casing{T}(
+        (od, units), (id, units), (wt, PPF::CsgWeight),
+        hanger, depth,
+        nothing, nothing, nothing, nothing,
+    )
 end
 
 """
-	calc_capacity(csg::Casing{T}, f::T=1.0) ::Tuple{T, T, T} 
-	where T<:Union{Float64, Float32}
+	calc_capacity(csg::Casing{T}, f::T=1.0) ::Tuple{T, T, T}
+		where T<:Union{Float64, Float32}
 
 Calculate the (3) capacties given a Casing object. Each capacity will
 be multiply by `f` conversion factor.
-"""
-function calc_capacity(csg::Casing{T}, f::T=1.0) ::NamedTuple where T<:Union{Float64, Float32}
-	external = area_circle(csg.od[1]) * f;
-	internal = area_circle(csg.id[1]) * f;
-	wall = area_circle(csg.od[1], csg.id[1]) * f;
 
-	return (external=external, internal=internal, wall=wall)
+# Arguments
+- `csg::Casing{T}`: The Casing object for which to calculate the capacities.
+- `f::T=1.0`: The conversion factor to multiply each capacity by.
+
+# Returns
+- `external::T`: The external capacity of the casing.
+- `internal::T`: The internal capacity of the casing.
+- `displace::T`: The wall capacity of the casing.
+"""
+function calc_capacity(csg::Casing{T}, f::T=1.0) where {T<:Union{Float64,Float32}}
+    external = area_circle(csg.od[1]) * f
+    internal = area_circle(csg.id[1]) * f
+    displace = area_circle(csg.od[1], csg.id[1]) * f
+
+    return (external=external, internal=internal, displace=displace)
 end
 
+
+"""
+	calc_capacity(outer::Casing{T}, inner::Casing{T}, f::T=1.0)
+		where {T<:Union{Float64,Float32}}
+
+Calculate the (3) capacties given two Casing objects. Each capacity will
+be multiply by `f` conversion factor.
+
+# Arguments
+- `outer::Casing{T}`: The outer Casing object.
+- `inner::Casing{T}`: The inner Casing object.
+- `f::T=1.0`: The conversion factor to multiply each capacity by.
+
+# Returns
+- `annular::T`: The annular capacity between the two casings.
+- `internal::T`: The internal capacity of the inner casing.
+- `displace::T`: The displacement capacity of the inner casing.
+"""
 function calc_capacity(
-	outer::Casing{T}, inner::Casing{T}, 
-	f::T=1.0) ::NamedTuple where T<:Union{Float64, Float32}
+    outer::Casing{T}, inner::Casing{T},
+    f::T=1.0) where {T<:Union{Float64,Float32}}
 
-	annular = area_circle(outer.id[1], inner.od[1]) * f;
-	internal = area_circle(inner.id[1]) * f;
-	displace = area_circle(inner.od[1], inner.id[1]) * f;
+    annular = area_circle(outer.id[1], inner.od[1]) * f
+    internal = area_circle(inner.id[1]) * f
+    displace = area_circle(inner.od[1], inner.id[1]) * f
 
-	return (annular=annular, internal=internal, displace=displace)
+    return (annular=annular, internal=internal, displace=displace)
 end
