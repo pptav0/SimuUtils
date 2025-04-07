@@ -1,3 +1,5 @@
+using NamedTuples
+
 # ----------------------------------------
 #
 # 	* Defined datatypes
@@ -147,7 +149,7 @@ function Casing(
 	if od <= id
 		throw(ArgumentError("Outer diameter must be larger than inner diameter"))
 	end
-	if hanger[1] > depth[1]
+	if !isnothing(hanger) && !isnothing(depth) && hanger[1] > depth[1]
 		throw(ArgumentError("Hanger cannot be deeper than Casing depth"))
 	end
 
@@ -159,4 +161,30 @@ function Casing(
 		hanger, depth,
 		nothing, nothing, nothing, nothing,
 	)
+end
+
+"""
+	calc_capacity(csg::Casing{T}, f::T=1.0) ::Tuple{T, T, T} 
+	where T<:Union{Float64, Float32}
+
+Calculate the (3) capacties given a Casing object. Each capacity will
+be multiply by `f` conversion factor.
+"""
+function calc_capacity(csg::Casing{T}, f::T=1.0) ::NamedTuple where T<:Union{Float64, Float32}
+	external = area_circle(csg.od[1]) * f;
+	internal = area_circle(csg.id[1]) * f;
+	wall = area_circle(csg.od[1], csg.id[1]) * f;
+
+	return (external=external, internal=internal, wall=wall)
+end
+
+function calc_capacity(
+	outer::Casing{T}, inner::Casing{T}, 
+	f::T=1.0) ::NamedTuple where T<:Union{Float64, Float32}
+
+	annular = area_circle(outer.id[1], inner.od[1]) * f;
+	internal = area_circle(inner.id[1]) * f;
+	displace = area_circle(inner.od[1], inner.id[1]) * f;
+
+	return (annular=annular, internal=internal, displace=displace)
 end
