@@ -22,6 +22,6 @@ export round_to, area_circle, convert,
     Casing, calc_capacity,
     plot_well_schem,
     plot_regression, calculate_r_squared,
-    Fluid, FluidType
+    Fluid, FluidType, Mud, Spacer, Cement
 
 end
