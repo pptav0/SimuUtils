@@ -12,14 +12,16 @@ include("geometry/area.jl")
 
 # include Oilfield module
 include("oilfield/wellbore.jl")
-# include("oilfield/casings.jl");
+include("oilfield/fluids.jl")
 
 # include plots functions
 include("plots/regression.jl")
 
 # export functions
 export round_to, area_circle, convert,
-    Casing, calc_capacity, plot_well_schem,
-    plot_regression, calculate_r_squared
+    Casing, calc_capacity,
+    plot_well_schem,
+    plot_regression, calculate_r_squared,
+    Fluid, FluidType, Mud, Spacer, Cement
 
 end

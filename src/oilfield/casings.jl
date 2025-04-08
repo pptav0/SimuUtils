@@ -109,7 +109,7 @@ struct Thread{T<:Float64}
     yield::T
 end
 
-mutable struct Casing{T<:Float64}
+mutable struct Casing{T<:Union{Float64}}
     od::Tuple{T,DiameterUnit}
     id::Tuple{T,DiameterUnit}
     wt::Tuple{T,CsgWeight}
