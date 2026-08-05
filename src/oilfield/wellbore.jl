@@ -4,9 +4,6 @@ using LaTeXStrings;
 
 Makie.set_theme!(ggthemr(:fresh))
 
-# functions
-include("./casings.jl")
-
 
 # Helper functions
 

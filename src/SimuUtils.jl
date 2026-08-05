@@ -11,6 +11,9 @@ include("helpers/regression.jl")
 include("geometry/area.jl")
 
 # include Oilfield module
+# casings.jl must precede wellbore.jl: it defines `Casing`, which
+# wellbore.jl uses in method signatures (exported: Casing, calc_capacity)
+include("oilfield/casings.jl")
 include("oilfield/wellbore.jl")
 include("oilfield/fluids.jl")
 
