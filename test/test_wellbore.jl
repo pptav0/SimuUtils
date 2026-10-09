@@ -1,7 +1,7 @@
 using Test
 using SimuUtils
 
-using UomDefinitions: Diameter, Length, inch, mm, ft, m
+using UomDefinitions: Diameter, Length, inch, mm, ft, m, bbl_ft, l_m, Capacity, BBL_PER_FT, L_PER_M, to_bbl_ft
 import Makie.Figure
 
 # Define test casings
@@ -81,4 +81,23 @@ end
     @test c.od isa Diameter{typeof(mm)} || c.od.value == 244.5
     @test c.depth.value == 1500.0
     @test c.wt[1] > 0.0
+end
+
+@testset "calc_capacity — legacy factor form and typed form agree" begin
+    outer = Casing(9.625, 8.755, inch; hanger=(0.0, ft), depth=(1500.0, ft))
+    inner = Casing(5.5, 4.892, inch;   hanger=(0.0, ft), depth=(3000.0, ft))
+    # legacy: area in in², f = bbl/ft per in² (1/808.5; the familiar 1029.4 applies to d², i.e. already has π/4)
+    leg = calc_capacity(outer, inner, 1/808.5)
+    typ = calc_capacity(outer, inner)                  # bbl/ft
+    @test typ.annular isa Capacity{BBL_PER_FT}
+    @test leg.annular  ≈ typ.annular.value  rtol=1e-4
+    @test leg.internal ≈ typ.internal.value rtol=1e-4
+    @test leg.displace ≈ typ.displace.value rtol=1e-4
+    # single casing, metric output
+    one = calc_capacity(inner; out=l_m)
+    @test one.internal isa Capacity{L_PER_M}
+    @test to_bbl_ft(one.internal).value ≈ typ.internal.value atol=1e-12
+    @test one.external.value ≈ one.internal.value + one.displace.value atol=1e-9
+    # legacy single-casing form: areas in in² when f = 1
+    @test calc_capacity(inner, 1.0).internal ≈ (π/4) * 4.892^2 atol=1e-9
 end

@@ -167,42 +167,85 @@ function Casing(
     )
 end
 
+# Unit singleton of a Casing diameter (`Diameter{IN}` -> `inch`, …)
+_unit(::Diameter{U}) where {U} = U()
+
+# Legacy area helper: cross-sectional area expressed in the diameter's own
+# unit squared (in² for inch casings, mm² for mm casings), so that the
+# user-supplied factor `f` of the legacy `calc_capacity(…, f)` keeps its
+# meaning. Computed through the single annulus core (`annulus_capacity`).
+function _area_in_unit2(od::Diameter, id::Real=0.0)
+    unit   = _unit(od)
+    area_m2 = annulus_capacity(od.value, id; unit=unit, out=m3_m).value
+    return area_m2 / to_m(Diameter(1.0, unit)).value^2
+end
+
 """
-	calc_capacity(csg::Casing{T}, f::T=1.0) ::Tuple{T, T, T}
+	calc_capacity(csg::Casing{T}, f::T) ::Tuple{T, T, T}
 		where T<:Union{Float64, Float32}
 
 Calculate the (3) capacties given a Casing object. Each capacity will
 be multiply by `f` conversion factor.
 
+Legacy form: areas are in the casing diameter unit squared (in² or mm²)
+and `f` is applied verbatim (`f` is required so this form never collides
+with the typed form below). Prefer the keyword form
+`calc_capacity(csg; out=bbl_ft)` which returns typed `Capacity` values.
+
 # Arguments
 - `csg::Casing{T}`: The Casing object for which to calculate the capacities.
-- `f::T=1.0`: The conversion factor to multiply each capacity by.
+- `f::T`: The conversion factor to multiply each capacity by (use `1.0` for raw areas).
 
 # Returns
 - `external::T`: The external capacity of the casing.
 - `internal::T`: The internal capacity of the casing.
 - `displace::T`: The wall capacity of the casing.
 """
-function calc_capacity(csg::Casing{T}, f::T=1.0) where {T<:Union{Float64,Float32}}
-    external = area_circle(csg.od.value) * f
-    internal = area_circle(csg.id.value) * f
-    displace = area_circle(csg.od.value, csg.id.value) * f
+function calc_capacity(csg::Casing{T}, f::T) where {T<:Union{Float64,Float32}}
+    external = _area_in_unit2(csg.od) * f
+    internal = _area_in_unit2(csg.id) * f
+    displace = _area_in_unit2(csg.od, csg.id.value) * f
+
+    return (external=external, internal=internal, displace=displace)
+end
+
+"""
+	calc_capacity(csg::Casing; out::CapacityUnit=bbl_ft)
+
+Typed form: the (3) capacities of a Casing as UomDefinitions `Capacity`
+quantities in the unit `out` (`bbl_ft`, `gal_ft`, `m3_m`, `l_m`).
+
+# Returns
+- `external`: [`hole_capacity`](@ref) of the OD (full circle, no washout).
+- `internal`: [`pipe_capacity`](@ref) of the ID.
+- `displace`: [`pipe_displacement`](@ref) of the steel wall.
+"""
+function calc_capacity(csg::Casing; out::CapacityUnit=bbl_ft)
+    unit = _unit(csg.od)
+    external = hole_capacity(csg.od.value; unit=unit, out=out)
+    internal = pipe_capacity(csg.id.value; unit=unit, out=out)
+    displace = pipe_displacement(csg.od.value, csg.id.value; unit=unit, out=out)
 
     return (external=external, internal=internal, displace=displace)
 end
 
 
 """
-	calc_capacity(outer::Casing{T}, inner::Casing{T}, f::T=1.0)
+	calc_capacity(outer::Casing{T}, inner::Casing{T}, f::T)
 		where {T<:Union{Float64,Float32}}
 
 Calculate the (3) capacties given two Casing objects. Each capacity will
 be multiply by `f` conversion factor.
 
+Legacy form: areas are in the casing diameter unit squared (in² or mm²)
+and `f` is applied verbatim (`f` is required so this form never collides
+with the typed form below). Prefer the keyword form
+`calc_capacity(outer, inner; out=bbl_ft)` which returns typed `Capacity` values.
+
 # Arguments
 - `outer::Casing{T}`: The outer Casing object.
 - `inner::Casing{T}`: The inner Casing object.
-- `f::T=1.0`: The conversion factor to multiply each capacity by.
+- `f::T`: The conversion factor to multiply each capacity by (use `1.0` for raw areas).
 
 # Returns
 - `annular::T`: The annular capacity between the two casings.
@@ -211,11 +254,32 @@ be multiply by `f` conversion factor.
 """
 function calc_capacity(
     outer::Casing{T}, inner::Casing{T},
-    f::T=1.0) where {T<:Union{Float64,Float32}}
+    f::T) where {T<:Union{Float64,Float32}}
 
-    annular = area_circle(outer.id.value, inner.od.value) * f
-    internal = area_circle(inner.id.value) * f
-    displace = area_circle(inner.od.value, inner.id.value) * f
+    annular = _area_in_unit2(outer.id, inner.od.value) * f
+    internal = _area_in_unit2(inner.id) * f
+    displace = _area_in_unit2(inner.od, inner.id.value) * f
+
+    return (annular=annular, internal=internal, displace=displace)
+end
+
+"""
+	calc_capacity(outer::Casing, inner::Casing; out::CapacityUnit=bbl_ft)
+
+Typed form: the (3) capacities of a casing-in-casing pair as UomDefinitions
+`Capacity` quantities in the unit `out`. Both casings must share a diameter unit.
+
+# Returns
+- `annular`: [`annulus_capacity`](@ref) between `outer` ID and `inner` OD.
+- `internal`: [`pipe_capacity`](@ref) of the inner ID.
+- `displace`: [`pipe_displacement`](@ref) of the inner steel wall.
+"""
+function calc_capacity(outer::Casing, inner::Casing; out::CapacityUnit=bbl_ft)
+    unit = _unit(outer.id)
+    _unit(inner.od) === unit || throw(ArgumentError("outer and inner casings must share a diameter unit"))
+    annular  = annulus_capacity(outer.id.value, inner.od.value; unit=unit, out=out)
+    internal = pipe_capacity(inner.id.value; unit=unit, out=out)
+    displace = pipe_displacement(inner.od.value, inner.id.value; unit=unit, out=out)
 
     return (annular=annular, internal=internal, displace=displace)
 end
