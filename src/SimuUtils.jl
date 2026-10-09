@@ -29,10 +29,13 @@ include("geometry/capacity.jl")
 # wellbore.jl uses in method signatures (exported: Casing, calc_capacity)
 include("oilfield/casings.jl")
 include("oilfield/wellbore.jl")
+# rheos.jl must precede fluids.jl: `Fluid` holds a `RheoModel`
+include("oilfield/rheos.jl")
 include("oilfield/fluids.jl")
 
 # include plots functions
 include("plots/regression.jl")
+include("plots/rheology.jl")
 
 # export functions
 export round_to,
@@ -41,6 +44,11 @@ export round_to,
     capacity_volume, annulus_volume, circle_volume,
     plot_well_schem,
     plot_regression, calculate_r_squared,
-    Fluid, FluidType, Mud, Spacer, Cement
+    Fluid, FluidType, Mud, Spacer, Cement, Brine, OBM, WBM, FreshWater, SeaWater, yp, pv,
+    RheoModel, Newtonian, PowerLaw, Bingham, HerschelBulkley, GeneralizedHB,
+    shear_stress, apparent_viscosity, yield_stress, bingham_equivalent, fit_rheology, CP_PER_LBF100FT2_S,
+    Rotor, Bob, Spring, FannReadings, FannRheology, FannInputs,
+    calc_shear_rate, calc_shear_stress, calc_spring_constant, ghb_model, ghb_model_fit, convert_muinf,
+    plot_rheology
 
 end
