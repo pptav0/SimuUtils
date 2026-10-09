@@ -1,4 +1,7 @@
 using SimuUtils
 using Test
 
-include("./test_uom.jl")
+@testset "SimuUtils" begin
+    include("./test_capacity.jl")
+    include("./test_wellbore.jl")
+end

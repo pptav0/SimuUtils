@@ -9,9 +9,9 @@ Shared utilities for the Simulytics hydraulics-simulation platform: numeric help
 
 ## What's inside
 
-- **Numeric helpers** (`helpers/`) — `round_to` for decimal rounding; enum-based unit-of-measure definitions (`VolumeUnit`, `DiameterUnit`, `LengthUnit`, `RateUnit`, `DensityUnit`, …) with a `convert` helper for engineering unit conversions.
+- **Numeric helpers** (`helpers/`) — `round_to` for decimal rounding. Units of measure (`Diameter`, `Length`, `Density`, `Volume`, … with `to_*` conversions and named constants) come from the [UomDefinitions](../UomDefinitions) package; SimuUtils defines no unit conversions of its own.
 - **Regression** (`helpers/regression.jl`) — linear and quadratic least-squares fits plus R² calculation (`calculate_r_squared`).
-- **Geometry** (`geometry/area.jl`) — `area_circle` for circle and annular (ring) cross-sections, with optional excess-area factor for hole washout.
+- **Geometry** (`geometry/capacity.jl`) — one unit-aware core, `annulus_capacity(od, id=0; unit, xs, out)`, covering rings and full circles (optional excess-area factor for hole washout); `circle_capacity` for the explicit `id = 0` case; oilfield wrappers `hole_capacity`, `pipe_capacity`, `pipe_displacement`; and volumes via `capacity_volume`, `annulus_volume`, `circle_volume`. Results are UomDefinitions `Capacity` / `Volume` quantities whose unit is chosen with `out=`; the cross-sectional area is the `m3_m` capacity read as m².
 - **Oilfield types** (`oilfield/`) — `Casing` (OD/ID, weight, hanger/setting depth, thread, grade, burst/collapse ratings) and wellbore schematic drawing.
 - **Plotting** (`plots/`) — `plot_regression` for experimental-vs-fitted data (linear or non-linear, with annotations and axis scaling) and `plot_well_schem` for well schematics, built on CairoMakie.
 
@@ -19,10 +19,22 @@ Shared utilities for the Simulytics hydraulics-simulation platform: numeric help
 
 ```julia
 using SimuUtils
+using UomDefinitions: inch, mm, ft, m, l_m, m3_m, m3
 
-# annular cross-section area between hole and pipe
-a = area_circle(8.5, 5.0)          # ring area
-a_xs = area_circle(8.5, 5.0; xs=0.2)  # with 20% excess
+# annular capacity between an 8.5" hole and a 5" pipe (bbl/ft by default)
+cap    = annulus_capacity(8.5, 5.0)                 # 0.0459 bbl/ft
+cap_xs = annulus_capacity(8.5, 5.0; xs=0.2)         # with 20% excess
+annulus_capacity(215.9, 127.0; unit=mm, out=l_m)    # metric in, L/m out
+annulus_capacity(8.5, 5.0; out=m3_m).value          # cross-section area in m²
+
+# full circle (id = 0): open hole / pipe bore, and the steel wall
+hole_capacity(8.5)                                  # 0.0702 bbl/ft
+pipe_capacity(4.892)
+pipe_displacement(5.5, 4.892)
+
+# volumes: any capacity × length
+capacity_volume(cap, 5000.0)                        # 229.48 bbl
+annulus_volume(8.5, 5.0, 1524.0; length_unit=m, out=m3)
 
 # fit and plot experimental data
 slope, intercept = SimuUtils.linear_regression(X, Y)
