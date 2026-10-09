@@ -9,7 +9,7 @@ Shared utilities for the Simulytics hydraulics-simulation platform: numeric help
 
 ## What's inside
 
-- **Numeric helpers** (`helpers/`) — `round_to` for decimal rounding; enum-based unit-of-measure definitions (`VolumeUnit`, `DiameterUnit`, `LengthUnit`, `RateUnit`, `DensityUnit`, …) with a `convert` helper for engineering unit conversions.
+- **Numeric helpers** (`helpers/`) — `round_to` for decimal rounding. Units of measure (`Diameter`, `Length`, `Density`, `Volume`, … with `to_*` conversions and named constants) come from the [UomDefinitions](../UomDefinitions) package; SimuUtils defines no unit conversions of its own.
 - **Regression** (`helpers/regression.jl`) — linear and quadratic least-squares fits plus R² calculation (`calculate_r_squared`).
 - **Geometry** (`geometry/area.jl`) — `area_circle` for circle and annular (ring) cross-sections, with optional excess-area factor for hole washout.
 - **Oilfield types** (`oilfield/`) — `Casing` (OD/ID, weight, hanger/setting depth, thread, grade, burst/collapse ratings) and wellbore schematic drawing.

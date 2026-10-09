@@ -16,28 +16,18 @@ const STEEL_DENSITY = 490.0 # lb/ft^3
 # 	* Specific Helper functions
 #
 # ----------------------------------------
+#
+# Diameter <-> feet conversions come from UomDefinitions (`to_ft(::Diameter)`,
+# `to_in(::Length)`, `to_mm(::Length)`), so the 12 in/ft and 304.8 mm/ft
+# factors live in one place (`IN_PER_FT`, `MM_PER_FT`).
 
 # Function to convert diameter to feet
-function to_feet(diameter::T, unit::DiameterUnit) where {T<:Union{Float64,Float32}}
-    if unit == IN::DiameterUnit
-        return diameter / 12.0
-    elseif unit == MM::DiameterUnit
-        return diameter / 304.8
-    else
-        throw(ArgumentError("Unsupported diameter unit"))
-    end
-end
+to_feet(diameter::T, unit::DiameterUnit) where {T<:Union{Float64,Float32}} =
+    to_ft(Diameter(diameter, unit)).value
 
 # Function to convert diameter from feet to the original unit
-function from_feet(diameter_ft::T, unit::DiameterUnit) where {T<:Union{Float64,Float32}}
-    if unit == IN::DiameterUnit
-        return diameter_ft * 12.0
-    elseif unit == MM::DiameterUnit
-        return diameter_ft * 304.8
-    else
-        throw(ArgumentError("Unsupported diameter unit"))
-    end
-end
+from_feet(diameter_ft::T, ::IN) where {T<:Union{Float64,Float32}} = to_in(Length(diameter_ft, ft)).value
+from_feet(diameter_ft::T, ::MM) where {T<:Union{Float64,Float32}} = to_mm(Length(diameter_ft, ft)).value
 
 """
 	calculate_casing_weight(
@@ -49,6 +39,7 @@ Function to calculate the weight of the casing in ppf (lb/ft)
 # Arguments
    - `od::T`: Outer diameter of the casing [in or mm].
    - `id::T`: Inner diameter of the casing [in or mm].
+   - `unit::DiameterUnit`: The unit of the diameters (`inch` or `mm`).
    - `material::T=STEEL_DENSITY`: The density of the material in lb/ft^3. Defaults to STEEL_DENSITY.
 
 # Returns
@@ -78,7 +69,7 @@ Function to calculate the inner diameter of the casing given the outer diameter 
 # Arguments
    - `od::T`: Outer diameter of the casing [in or mm].
    - `weight_ppf::T`: The weight of the casing in lb/ft.
-   - `unit::DiameterUnit`: The unit of measurement for the diameters.
+   - `unit::DiameterUnit`: The unit of measurement for the diameters (`inch` or `mm`).
    - `material::T=STEEL_DENSITY`: The density of the material in lb/ft^3. Defaults to STEEL_DENSITY.
 
 # Returns
@@ -109,53 +100,68 @@ struct Thread{T<:Float64}
     yield::T
 end
 
+"""
+    Casing{T}
+
+Casing section. Diameters are stored as UomDefinitions `Diameter` quantities
+and depths as `Length` quantities, so the unit travels with the value
+(`csg.od.value`, `csg.depth.value`).
+"""
 mutable struct Casing{T<:Union{Float64}}
-    od::Tuple{T,DiameterUnit}
-    id::Tuple{T,DiameterUnit}
+    od::Diameter
+    id::Diameter
     wt::Tuple{T,CsgWeight}
-    hanger::Union{Nothing,Tuple{T,LengthUnit}}
-    depth::Union{Nothing,Tuple{T,LengthUnit}}
+    hanger::Union{Nothing,Length}
+    depth::Union{Nothing,Length}
     thread::Union{Nothing,Thread}
     grade::Union{Nothing,String}
     burst::Union{Nothing,T}
     collapse::Union{Nothing,T}
 end
 
+# Accept either a typed `Length` or the legacy `(value, unit)` tuple for depths.
+_as_length(x::Nothing) = nothing
+_as_length(x::Length)  = x
+_as_length(x::Tuple{<:Real,<:LengthUnit}) = Length(x[1], x[2])
+
 """
 	Casing(
-		od::T, id::T, units::DiameterUnit=IN::DiameterUnit;
-		hanger::Union{Nothing, Tuple{T, LengthUnit}}=nothing,
-		depth::Union{Nothing, Tuple{T, LengthUnit}}=nothing) where T<:Union{Float64, Float32}
+		od::T, id::T, units::DiameterUnit=inch;
+		hanger::Union{Nothing, Length, Tuple{Real, LengthUnit}}=nothing,
+		depth::Union{Nothing, Length, Tuple{Real, LengthUnit}}=nothing) where T<:Union{Float64, Float32}
 
 Constructor given `od` and `id` inputs. `depth` and other `Casing` properties are optional.
 
 # Arguments
 - `od::T`: The outer diameter of the casing [in or mm].
 - `id::T`: The inner diameter of the casing [in or mm].
-- `units::DiameterUnit`: The unit of measurement for the diameter inputs.
-- `depth::Union{Nothing, Tuple{T, LengthUnit}}`: The depth of the casing [ft or m].
+- `units::DiameterUnit`: The unit of measurement for the diameter inputs (`inch` or `mm`).
+- `hanger`: The hanger depth of the casing, as `Length(x, ft|m)` or `(x, ft|m)`.
+- `depth`: The depth of the casing [ft or m], as `Length(x, ft|m)` or `(x, ft|m)`.
 
 # Result
 - `Casing{T}`: The constructed `Casing` object.
 """
 function Casing(
-    od::T, id::T, units::DiameterUnit=IN::DiameterUnit;
-    hanger::Union{Nothing,Tuple{T,LengthUnit}}=nothing,
-    depth::Union{Nothing,Tuple{T,LengthUnit}}=nothing) where {T<:Union{Float64,Float32}}
+    od::T, id::T, units::DiameterUnit=inch;
+    hanger=nothing, depth=nothing) where {T<:Union{Float64,Float32}}
+
+    hanger = _as_length(hanger)
+    depth  = _as_length(depth)
 
     # Assert Inputs diameters and depths
     if od <= id
         throw(ArgumentError("Outer diameter must be larger than inner diameter"))
     end
-    if !isnothing(hanger) && !isnothing(depth) && hanger[1] > depth[1]
+    if !isnothing(hanger) && !isnothing(depth) && hanger.value > depth.value
         throw(ArgumentError("Hanger cannot be deeper than Casing depth"))
     end
 
     # Calculate the wall thickness of the casing
     wt = calc_casing_weight(od, id, units)
 
-    Casing{T}(
-        (od, units), (id, units), (wt, PPF::CsgWeight),
+    Casing{Float64}(
+        Diameter(od, units), Diameter(id, units), (Float64(wt), PPF::CsgWeight),
         hanger, depth,
         nothing, nothing, nothing, nothing,
     )
@@ -178,9 +184,9 @@ be multiply by `f` conversion factor.
 - `displace::T`: The wall capacity of the casing.
 """
 function calc_capacity(csg::Casing{T}, f::T=1.0) where {T<:Union{Float64,Float32}}
-    external = area_circle(csg.od[1]) * f
-    internal = area_circle(csg.id[1]) * f
-    displace = area_circle(csg.od[1], csg.id[1]) * f
+    external = area_circle(csg.od.value) * f
+    internal = area_circle(csg.id.value) * f
+    displace = area_circle(csg.od.value, csg.id.value) * f
 
     return (external=external, internal=internal, displace=displace)
 end
@@ -207,9 +213,9 @@ function calc_capacity(
     outer::Casing{T}, inner::Casing{T},
     f::T=1.0) where {T<:Union{Float64,Float32}}
 
-    annular = area_circle(outer.id[1], inner.od[1]) * f
-    internal = area_circle(inner.id[1]) * f
-    displace = area_circle(inner.od[1], inner.id[1]) * f
+    annular = area_circle(outer.id.value, inner.od.value) * f
+    internal = area_circle(inner.id.value) * f
+    displace = area_circle(inner.od.value, inner.id.value) * f
 
     return (annular=annular, internal=internal, displace=displace)
 end

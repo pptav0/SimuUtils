@@ -7,15 +7,19 @@ Makie.set_theme!(ggthemr(:fresh))
 
 # Helper functions
 
+# Axis label for a UomDefinitions length-unit singleton
+_unit_label(::FT) = "ft"
+_unit_label(::M)  = "m"
+
 function draw_casing_section!(ax, section::Casing, color, alpha)
     # Section params
-    top = section.hanger[1]
-	bottom = section.depth[1]
-    right_outer = section.od[1] / 2
+    top = section.hanger.value
+	bottom = section.depth.value
+    right_outer = section.od.value / 2
     left_outer = -right_outer
-    right_inner = section.id[1] / 2
+    right_inner = section.id.value / 2
     left_inner = -right_inner
-    label = "$(section.od[1])"
+    label = "$(section.od.value)"
 
     # Draw outer wall
     rect_outer = [Point2f(left_outer, top), Point2f(right_outer, top),
@@ -37,7 +41,7 @@ end
 		outer_geometry::Vector{Casing},
 		inner_geometry::Vector{Casing};
 		airgap=nothing, water_depth=nothing,
-		units::LengthUnit=M::LengthUnit)
+		units::LengthUnit=m)
 
 Plots a 2D wellbore schematic with outer and inner casings.
 """
@@ -45,12 +49,12 @@ function plot_well_schem(
 		outer_geometry::Vector{Casing},
 		inner_geometry::Vector{Casing};
 		airgap=nothing, water_depth=nothing,
-		units::LengthUnit=M::LengthUnit)
+		units::LengthUnit=m)
 
     # Prepare depths
     total_depth = maximum([
-    	maximum([g.depth[1] for g in inner_geometry if g !== nothing]),
-    	maximum([g.depth[1] for g in outer_geometry if g !== nothing]) ])
+    	maximum([g.depth.value for g in inner_geometry if g !== nothing]),
+    	maximum([g.depth.value for g in outer_geometry if g !== nothing]) ])
     offshore_offset = if airgap !== nothing && water_depth !== nothing
         airgap + water_depth
     else
@@ -58,7 +62,7 @@ function plot_well_schem(
     end
 
     # Set up the figure
-    uom = lowercase("$units")
+    uom = _unit_label(units)
     fig = Figure(; size=(600, 800))
     ax = Axis(
     	fig[1, 1],
@@ -73,10 +77,10 @@ function plot_well_schem(
         prev_right_inner = nothing
         for section in geom
         	# Adjust top position based on hanger
-            if section.hanger !== nothing && section.hanger[1] > hanger
-                overlap = bottom - section.hanger[1]
+            if section.hanger !== nothing && section.hanger.value > hanger
+                overlap = bottom - section.hanger.value
             end
-            hanger = section.hanger[1]
+            hanger = section.hanger.value
 
             # Draw casing section
             bottom, left, right = draw_casing_section!(ax, section, color, alpha)
@@ -121,8 +125,8 @@ function plot_well_schem(
 
     # Auto limits and aspect
     xlims!(ax,
-     	-maximum([g.od[1] for g in outer_geometry]) * 0.6,
-      	 maximum([g.od[1] for g in outer_geometry]) * 0.6)
+     	-maximum([g.od.value for g in outer_geometry]) * 0.6,
+      	 maximum([g.od.value for g in outer_geometry]) * 0.6)
     ylims!(ax, total_depth + offshore_offset, 0)
     axislegend(ax, position = :rb)
 
