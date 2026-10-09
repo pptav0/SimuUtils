@@ -12,7 +12,10 @@ import UomDefinitions:
     DiameterUnit, Diameter, IN, MM, D64, inch, mm, d64, to_in, to_mm,
     LengthUnit, Length, FT, M, ft, m, to_ft, to_m,
     DensityUnit, Density, PPG, SG, KG_M3, ppg, sg, kg_m3,
-    FT3_PER_BBL, GAL_PER_BBL, M3_PER_FT3
+    VolumeUnit, Volume, M3, BBL, L, m3, bbl, ltr, to_m3, to_bbl, to_ltr,
+    CapacityUnit, Capacity, BBL_PER_FT, GAL_PER_FT, M3_PER_M, L_PER_M,
+    bbl_ft, gal_ft, m3_m, l_m, to_bbl_ft, to_gal_ft, to_m3_m, to_l_m,
+    to_unit
 
 # Include all  functions
 include("helpers/numeric.jl")
