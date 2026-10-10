@@ -77,7 +77,7 @@ function plot_well_schem(
         prev_right_inner = nothing
         for section in geom
         	# Adjust top position based on hanger
-            if section.hanger !== nothing && section.hanger.value > hanger
+            if !isnothing(section.hanger) && section.hanger.value > hanger
                 overlap = bottom - section.hanger.value
             end
             hanger = section.hanger.value

@@ -124,11 +124,13 @@ _as_length(x::Nothing) = nothing
 _as_length(x::Length)  = x
 _as_length(x::Tuple{<:Real,<:LengthUnit}) = Length(x[1], x[2])
 
+
 """
-	Casing(
-		od::T, id::T, units::DiameterUnit=inch;
+    Casing(
+		od::T, id::T, units::DiameterUnit;
 		hanger::Union{Nothing, Length, Tuple{Real, LengthUnit}}=nothing,
-		depth::Union{Nothing, Length, Tuple{Real, LengthUnit}}=nothing) where T<:Union{Float64, Float32}
+		depth::Union{Nothing, Length, Tuple{Real, LengthUnit}}=nothing)
+		where T<:Union{Float64, Float32}
 
 Constructor given `od` and `id` inputs. `depth` and other `Casing` properties are optional.
 
