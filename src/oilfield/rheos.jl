@@ -23,33 +23,53 @@ Constitutive model τ(γ̇). Concrete: [`Newtonian`](@ref), [`PowerLaw`](@ref),
 """
 abstract type RheoModel end
 
-"τ = μ·γ̇ — `μ` [cP]"
+# Parameter validation (spec D4): UomDefinitions validators, single `new` site per
+# model. "≥ 0" parameters (μ, K, τ0, μp) use `validate_value`; "> 0" parameters
+# (n, m, μ∞, τ_ref) use `validate_positive_value`. Errors: `InvalidValueError`
+# (non-finite), `NegativeValueError` (< 0), `ZeroValueError` (== 0 where > 0 is required).
+
+"τ = μ·γ̇ — `μ` [cP] ≥ 0. Throws `InvalidValueError` / `NegativeValueError`."
 struct Newtonian <: RheoModel
     μ::Float64
-    Newtonian(μ::Real) = μ < 0 ? throw(ArgumentError("μ must be ≥ 0")) : new(float(μ))
+    function Newtonian(μ::Real)
+        validate_value(μ)
+        new(float(μ))
+    end
 end
 
-"τ = K·γ̇ⁿ — `K` [lbf·sⁿ/100 ft²], `n` > 0"
+"τ = K·γ̇ⁿ — `K` [lbf·sⁿ/100 ft²] ≥ 0, `n` > 0. Throws `InvalidValueError` / `NegativeValueError` / `ZeroValueError` (n)."
 struct PowerLaw <: RheoModel
     K::Float64
     n::Float64
-    PowerLaw(K::Real, n::Real) = (K < 0 || n <= 0) ? throw(ArgumentError("K ≥ 0 and n > 0 required")) : new(float(K), float(n))
+    function PowerLaw(K::Real, n::Real)
+        validate_value(K)
+        validate_positive_value(n)
+        new(float(K), float(n))
+    end
 end
 
-"τ = τ0 + μp·γ̇ — `τ0` [lbf/100 ft²], `μp` [cP]"
+"τ = τ0 + μp·γ̇ — `τ0` [lbf/100 ft²] ≥ 0, `μp` [cP] ≥ 0. Throws `InvalidValueError` / `NegativeValueError`."
 struct Bingham <: RheoModel
     τ0::Float64
     μp::Float64
-    Bingham(τ0::Real, μp::Real) = (τ0 < 0 || μp < 0) ? throw(ArgumentError("τ0 ≥ 0 and μp ≥ 0 required")) : new(float(τ0), float(μp))
+    function Bingham(τ0::Real, μp::Real)
+        validate_value(τ0)
+        validate_value(μp)
+        new(float(τ0), float(μp))
+    end
 end
 
-"τ = τ0 + K·γ̇ⁿ — `τ0` [lbf/100 ft²], `K` [lbf·sⁿ/100 ft²], `n` > 0"
+"τ = τ0 + K·γ̇ⁿ — `τ0` [lbf/100 ft²] ≥ 0, `K` [lbf·sⁿ/100 ft²] ≥ 0, `n` > 0. Throws `InvalidValueError` / `NegativeValueError` / `ZeroValueError` (n)."
 struct HerschelBulkley <: RheoModel
     τ0::Float64
     K::Float64
     n::Float64
-    HerschelBulkley(τ0::Real, K::Real, n::Real) =
-        (τ0 < 0 || K < 0 || n <= 0) ? throw(ArgumentError("τ0 ≥ 0, K ≥ 0, n > 0 required")) : new(float(τ0), float(K), float(n))
+    function HerschelBulkley(τ0::Real, K::Real, n::Real)
+        validate_value(τ0)
+        validate_value(K)
+        validate_positive_value(n)
+        new(float(τ0), float(K), float(n))
+    end
 end
 
 """
@@ -57,6 +77,9 @@ end
 
 (τ/τ_ref)ᵐ = (τ0/τ_ref)ᵐ + (μ∞·γ̇/τ_ref)ⁿ — `τ0` and `τ_ref` [lbf/100 ft²]
 (τ_ref is a **stress**, default 1 lbf/100 ft²), `μ∞` [cP], `m`, `n` > 0.
+
+`τ0` ≥ 0; `μ∞`, `m`, `n`, `τ_ref` > 0. Throws `InvalidValueError` (non-finite),
+`NegativeValueError` (negative) or `ZeroValueError` (a zero `> 0` parameter).
 """
 struct GeneralizedHB <: RheoModel
     τ0::Float64
@@ -64,10 +87,14 @@ struct GeneralizedHB <: RheoModel
     m::Float64
     n::Float64
     τ_ref::Float64
-    GeneralizedHB(τ0::Real, μ∞::Real, m::Real, n::Real; τ_ref::Real=1.0) =
-        (τ0 < 0 || μ∞ <= 0 || m <= 0 || n <= 0 || τ_ref <= 0) ?
-            throw(ArgumentError("τ0 ≥ 0, μ∞ > 0, m > 0, n > 0, τ_ref > 0 required")) :
-            new(float(τ0), float(μ∞), float(m), float(n), float(τ_ref))
+    function GeneralizedHB(τ0::Real, μ∞::Real, m::Real, n::Real; τ_ref::Real=1.0)
+        validate_value(τ0)
+        validate_positive_value(μ∞)
+        validate_positive_value(m)
+        validate_positive_value(n)
+        validate_positive_value(τ_ref)
+        new(float(τ0), float(μ∞), float(m), float(n), float(τ_ref))
+    end
 end
 
 _field(μ_cp) = μ_cp / CP_PER_LBF100FT2_S          # cP → lbf·s/100 ft²
@@ -78,7 +105,10 @@ shear_stress(m::PowerLaw, γ̇::Real)        = m.K * γ̇^m.n
 shear_stress(m::Bingham, γ̇::Real)         = m.τ0 + _field(m.μp) * γ̇
 shear_stress(m::HerschelBulkley, γ̇::Real) = m.τ0 + m.K * γ̇^m.n
 function shear_stress(m::GeneralizedHB, γ̇::Real)
-    base = max((m.τ0 / m.τ_ref)^m.m + (_field(m.μ∞) * γ̇ / m.τ_ref)^m.n, 1e-300)
+    base = max(
+        (m.τ0 / m.τ_ref)^m.m + (_field(m.μ∞) * γ̇ / m.τ_ref)^m.n,
+        1e-300
+    )
     return m.τ_ref * base^(1 / m.m)
 end
 shear_stress(m::RheoModel, γ̇::AbstractVector) = [shear_stress(m, g) for g in γ̇]
@@ -116,27 +146,64 @@ function _report_fit(m::RheoModel, r2::Real)
 end
 
 """
+    _check_rheogram(γ̇, τ, nparams)
+
+Input guard shared by every `fit_rheology` method. `ArgumentError` for
+structural or degenerate rheograms (length mismatch, fewer than `nparams`
+points or distinct shear rates, no positive shear rate, no positive stress);
+`InvalidValueError` for non-finite entries; `NegativeValueError` for negative
+shear rates or stresses.
+"""
+function _check_rheogram(γ̇::AbstractVector, τ::AbstractVector, nparams::Int)
+    length(γ̇) == length(τ) ||
+        throw(ArgumentError("shear rate and shear stress vectors must have the same length"))
+    length(γ̇) >= nparams ||
+        throw(ArgumentError("rheogram needs at least $nparams points"))
+    (all(isfinite, γ̇) && all(isfinite, τ)) || throw(InvalidValueError())
+    (all(>=(0), γ̇) && all(>=(0), τ))       || throw(NegativeValueError())
+    length(unique(γ̇)) >= nparams ||
+        throw(ArgumentError("rheogram needs at least $nparams distinct shear rates"))
+    any(>(0), γ̇) || throw(ArgumentError("rheogram has no positive shear rate"))
+    any(>(0), τ) || throw(ArgumentError("rheogram has no positive shear stress"))
+    return nothing
+end
+
+"""
     fit_rheology(Model, γ̇, τ) -> (model, r2)
 
 Fit a rheogram. Newtonian, Bingham and Power Law are closed-form least
 squares; Herschel–Bulkley and Generalized HB use BlackBoxOptim.
+
+Inputs are checked by [`_check_rheogram`](@ref) first: `ArgumentError` for a
+length mismatch, too few points or distinct shear rates, or a rheogram with no
+positive shear rate / stress; `InvalidValueError` for non-finite entries;
+`NegativeValueError` for negative entries. The Power Law fit additionally
+throws `ZeroValueError` when any shear rate or stress is zero (log transform).
+A single-point Newtonian fit is exact by construction and reports `r2 = 1.0`.
 """
 function fit_rheology(::Type{Newtonian}, γ̇::AbstractVector, τ::AbstractVector)
+    _check_rheogram(γ̇, τ, 1)
     μf = sum(γ̇ .* τ) / sum(γ̇ .^ 2)                       # through the origin
     m = Newtonian(μf * CP_PER_LBF100FT2_S)
-    return _report_fit(m, calculate_r_squared(τ, shear_stress(m, γ̇)))
+    # one point determines μ exactly; R² is undefined there and reported as 1.0
+    r2 = length(γ̇) == 1 ? 1.0 : calculate_r_squared(τ, shear_stress(m, γ̇))
+    return _report_fit(m, r2)
 end
 function fit_rheology(::Type{Bingham}, γ̇::AbstractVector, τ::AbstractVector)
+    _check_rheogram(γ̇, τ, 2)
     slope, intercept = linear_regression(collect(γ̇), collect(τ))
     m = Bingham(max(intercept, 0.0), max(slope, 0.0) * CP_PER_LBF100FT2_S)
     return _report_fit(m, calculate_r_squared(τ, shear_stress(m, γ̇)))
 end
 function fit_rheology(::Type{PowerLaw}, γ̇::AbstractVector, τ::AbstractVector)
+    _check_rheogram(γ̇, τ, 2)
+    (all(>(0), γ̇) && all(>(0), τ)) || throw(ZeroValueError())     # log transform
     slope, intercept = linear_regression(log.(collect(γ̇)), log.(collect(τ)))
     m = PowerLaw(exp(intercept), slope)
     return _report_fit(m, calculate_r_squared(τ, shear_stress(m, γ̇)))
 end
 function fit_rheology(::Type{HerschelBulkley}, γ̇::AbstractVector, τ::AbstractVector)
+    _check_rheogram(γ̇, τ, 3)
     loss(p) = sum(abs2, shear_stress(HerschelBulkley(p[1], p[2], p[3]), γ̇) .- τ)
     res = bboptimize(loss; SearchRange=[(0.0, maximum(τ)), (1e-6, maximum(τ)), (0.05, 1.5)],
                      Method=:adaptive_de_rand_1_bin_radiuslimited, MaxSteps=50_000, TraceMode=:silent)
@@ -145,6 +212,7 @@ function fit_rheology(::Type{HerschelBulkley}, γ̇::AbstractVector, τ::Abstrac
     return _report_fit(m, calculate_r_squared(τ, shear_stress(m, γ̇)))
 end
 function fit_rheology(::Type{GeneralizedHB}, γ̇::AbstractVector, τ::AbstractVector)
+    _check_rheogram(γ̇, τ, 4)
     params, r2 = ghb_model_fit(γ̇, τ)                      # legacy fit, μ∞ in lbf·s/100 ft²
     m = GeneralizedHB(params[1], params[2] * CP_PER_LBF100FT2_S, params[3], params[4])
     return _report_fit(m, r2)
@@ -158,7 +226,18 @@ end
 const FloatNothing = Union{Missing,Nothing,Float64}
 const NumberNothing = Union{Missing,Nothing,Number}
 
-# Define the FannReadings struct
+"A Fann dial reading counts as present unless it is `nothing` or `missing`."
+_fann_present(r) = !(r === nothing || ismissing(r))
+
+"""
+    FannReadings(r600, r300, r200, r100, r60, r30, r6, r3)
+
+Fann-35 dial readings [degrees] at the standard rotor speeds. A reading of
+`nothing`, `missing` or `0` means "not read" and is dropped by the rheogram
+filter. Present readings must be finite (`InvalidValueError`) and non-negative
+(`NegativeValueError`); at least two readings must be present and positive
+(`ArgumentError`), the minimum for any rheology fit.
+"""
 struct FannReadings{T<:FloatNothing}
     r600::T
     r300::T
@@ -169,13 +248,19 @@ struct FannReadings{T<:FloatNothing}
     r6::T
     r3::T
 
-    # Inner constructor for FannReadings
+    # Inner constructor for FannReadings — the single `new` site
     function FannReadings(
         r600::NumberNothing, r300::NumberNothing,
         r200::NumberNothing, r100::NumberNothing,
         r60::NumberNothing, r30::NumberNothing,
         r6::NumberNothing, r3::NumberNothing
-    ) # Return a new instance of FannReadings
+    )
+        readings = (r600, r300, r200, r100, r60, r30, r6, r3)
+        for r in readings
+            _fann_present(r) && validate_value(r)
+        end
+        count(r -> _fann_present(r) && r > 0, readings) >= 2 ||
+            throw(ArgumentError("FannReadings needs at least two positive dial readings"))
         new{FloatNothing}(r600, r300, r200, r100, r60, r30, r6, r3)
     end
 end
@@ -194,7 +279,7 @@ function FannReadings(readings::FannReadings)
     filtered_rpm = Int[]
     filtered_readings = Float64[]
     for (rpm, read) in zip(rpm_values, dial_readings)
-        if (read !== nothing) && (read > 0.0)
+        if _fann_present(read) && (read > 0.0)
             push!(filtered_rpm, rpm)
             push!(filtered_readings, read)
         end

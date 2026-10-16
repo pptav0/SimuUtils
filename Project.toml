@@ -5,21 +5,24 @@ authors = ["Jose Guzman <pepetavo@pm.me> and contributors"]
 
 [deps]
 BlackBoxOptim = "a134a8b2-14d6-55f6-9291-3336d3ab0209"
-CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
-MakieThemes = "e296ed71-da82-5faf-88ab-0034a9761098"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 UomDefinitions = "5c4bf7a8-0757-40b8-9968-47d0ead680d5"
+
+[weakdeps]
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+MakieThemes = "e296ed71-da82-5faf-88ab-0034a9761098"
+
+[extensions]
+SimuUtilsMakieExt = ["CairoMakie", "MakieThemes"]
 
 [compat]
 BlackBoxOptim = "0.6"
 CairoMakie = "0.13.2"
 LaTeXStrings = "1.4.0"
 LinearAlgebra = "1.11.0"
-Makie = "0.22.2"
 MakieThemes = "0.1.4"
 Printf = "1.11.0"
 Statistics = "1.11.1"
@@ -27,7 +30,9 @@ UomDefinitions = "0.4"
 julia = "1.11"
 
 [extras]
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+MakieThemes = "e296ed71-da82-5faf-88ab-0034a9761098"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Test", "CairoMakie", "MakieThemes"]
