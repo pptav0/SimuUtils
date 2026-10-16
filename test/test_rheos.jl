@@ -117,8 +117,9 @@ const Γ̇_FANN = [1022.0, 511.0, 340.7, 170.3, 102.2, 51.1, 10.2, 5.1]
     @test abs(m.μp - 30.0) / 30.0 < 0.05
     @test r2 > 0.99
     # single-point Newtonian is exact (regression guard — passes before Task 2.4)
-    nw, _ = fit_rheology(Newtonian, [511.0], [shear_stress(Newtonian(25.0), 511.0)])
+    nw, r2n = fit_rheology(Newtonian, [511.0], [shear_stress(Newtonian(25.0), 511.0)])
     @test nw.μ ≈ 25.0 atol=1e-9
+    @test r2n == 1.0                                  # R² undefined for one point; reported as exact
     # integer parameters are accepted and stored as Float64
     @test Bingham(10, 30).τ0 === 10.0
     @test GeneralizedHB(5, 30, 1, 1; τ_ref=2).τ_ref === 2.0

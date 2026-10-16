@@ -179,12 +179,15 @@ length mismatch, too few points or distinct shear rates, or a rheogram with no
 positive shear rate / stress; `InvalidValueError` for non-finite entries;
 `NegativeValueError` for negative entries. The Power Law fit additionally
 throws `ZeroValueError` when any shear rate or stress is zero (log transform).
+A single-point Newtonian fit is exact by construction and reports `r2 = 1.0`.
 """
 function fit_rheology(::Type{Newtonian}, γ̇::AbstractVector, τ::AbstractVector)
     _check_rheogram(γ̇, τ, 1)
     μf = sum(γ̇ .* τ) / sum(γ̇ .^ 2)                       # through the origin
     m = Newtonian(μf * CP_PER_LBF100FT2_S)
-    return _report_fit(m, calculate_r_squared(τ, shear_stress(m, γ̇)))
+    # one point determines μ exactly; R² is undefined there and reported as 1.0
+    r2 = length(γ̇) == 1 ? 1.0 : calculate_r_squared(τ, shear_stress(m, γ̇))
+    return _report_fit(m, r2)
 end
 function fit_rheology(::Type{Bingham}, γ̇::AbstractVector, τ::AbstractVector)
     _check_rheogram(γ̇, τ, 2)
