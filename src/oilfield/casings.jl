@@ -178,7 +178,7 @@ _unit(::Diameter{U}) where {U} = U()
 # meaning. Computed through the single annulus core (`annulus_capacity`).
 function _area_in_unit2(od::Diameter, id::Real=0.0)
     unit   = _unit(od)
-    area_m2 = annulus_capacity(od.value, id; unit=unit, out=m3_m).value
+    area_m2 = annulus_capacity(od, Diameter(id, unit); out=m3_m).value
     return area_m2 / to_m(Diameter(1.0, unit)).value^2
 end
 
@@ -269,7 +269,7 @@ end
 	calc_capacity(outer::Casing, inner::Casing; out::CapacityUnit=bbl_ft)
 
 Typed form: the (3) capacities of a casing-in-casing pair as UomDefinitions
-`Capacity` quantities in the unit `out`. Both casings must share a diameter unit.
+`Capacity` quantities in the unit `out`. The two casings may use different diameter units.
 
 # Returns
 - `annular`: [`annulus_capacity`](@ref) between `outer` ID and `inner` OD.
@@ -277,9 +277,8 @@ Typed form: the (3) capacities of a casing-in-casing pair as UomDefinitions
 - `displace`: [`pipe_displacement`](@ref) of the inner steel wall.
 """
 function calc_capacity(outer::Casing, inner::Casing; out::CapacityUnit=bbl_ft)
-    unit = _unit(outer.id)
-    _unit(inner.od) === unit || throw(ArgumentError("outer and inner casings must share a diameter unit"))
-    annular  = annulus_capacity(outer.id.value, inner.od.value; unit=unit, out=out)
+    unit = _unit(inner.od)
+    annular  = annulus_capacity(outer.id, inner.od; out=out)        # units may differ
     internal = pipe_capacity(inner.id.value; unit=unit, out=out)
     displace = pipe_displacement(inner.od.value, inner.id.value; unit=unit, out=out)
 
