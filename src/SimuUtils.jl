@@ -15,7 +15,7 @@ import UomDefinitions:
     VolumeUnit, Volume, M3, BBL, L, m3, bbl, ltr, to_m3, to_bbl, to_ltr,
     CapacityUnit, Capacity, BBL_PER_FT, GAL_PER_FT, FT3_PER_FT, M3_PER_M, L_PER_M,
     bbl_ft, gal_ft, ft3_ft, m3_m, l_m, to_bbl_ft, to_gal_ft, to_ft3_ft, to_m3_m, to_l_m,
-    to_unit
+    to_unit, validate_value
 
 # Include all  functions
 include("helpers/numeric.jl")
