@@ -33,17 +33,22 @@
 # Output units are chosen with a typed singleton keyword (`out::CapacityUnit`
 # or `out::VolumeUnit`); no `unit=` / `length_unit=` input keyword exists.
 #
+# Error types (D4, closed 2026-10-16): od == id → ZeroCapacityError, od < id →
+# NegativeValueError, non-finite xs → InvalidValueError; the only ArgumentError
+# left is the structural xs ∉ [0, 1] range check. Negative / non-finite
+# diameters and lengths are rejected by the UomDefinitions constructors.
+#
 # The oilfield-named wrappers (`hole_capacity`, `pipe_capacity`,
 # `pipe_displacement`) take `Diameter`s only and fix the semantics and which
 # arguments make sense (e.g. washout never applies to steel). All of them
 # return a UomDefinitions `Capacity{U}` whose unit is chosen with the `out`
 # keyword, and the cross-sectional area is the `m3_m` capacity read as m².
 
-# Shared argument check for the washout / excess factor
+# Shared argument check for the washout / excess factor: non-finite is an
+# invalid value (UomDefinitions type); out of range is a structural error.
 function _check_washout(xs::Real)
-    if !(0.0 <= xs <= 1.0)
-        throw(ArgumentError("Washout factor xs must be in [0.0, 1.0], got $xs."))
-    end
+    isfinite(xs) || throw(InvalidValueError())
+    0.0 <= xs <= 1.0 || throw(ArgumentError("Washout factor xs must be in [0.0, 1.0], got $xs."))
 end
 
 # ================================================================================
@@ -72,8 +77,8 @@ capacity in m² (`to_m3_m(cap).value`).
 
 # Throws
 - `NegativeValueError` / `InvalidValueError`: raised by `Diameter` for a negative or non-finite value
-- `ArgumentError`: If `d == 0` (no area)
-- `ArgumentError`: If `xs ∉ [0.0, 1.0]` (invalid washout factor)
+- `ZeroCapacityError`: If `d == 0` (no area)
+- `InvalidValueError`: If `xs` is non-finite; `ArgumentError`: If `xs ∉ [0.0, 1.0]`
 - `MethodError`: If a bare number is passed instead of a `Diameter`
 
 Equivalent to the single-`Diameter` form of [`annulus_capacity`](@ref); provided
@@ -132,8 +137,9 @@ the cross-sectional area is numerically the `m3_m` capacity in m²
 
 # Throws
 - `NegativeValueError` / `InvalidValueError`: negative or non-finite diameters (raised by `Diameter`)
-- `ArgumentError`: If `od ≤ id` after conversion to inches (invalid annular geometry)
-- `ArgumentError`: If `xs ∉ [0.0, 1.0]`
+- `ZeroCapacityError`: If `od == id` after conversion to inches (judged with `rtol = 1e-9`): zero annulus
+- `NegativeValueError`: If `od < id` after conversion: inverted (negative) annulus
+- `InvalidValueError`: If `xs` is non-finite; `ArgumentError`: If `xs ∉ [0.0, 1.0]` (structural)
 - `MethodError`: If a bare number is passed instead of a `Diameter`
 - `TypeError`: If `out` is not a `CapacityUnit` singleton
 
@@ -160,9 +166,12 @@ function annulus_capacity(
     # Finiteness and sign were already enforced by the Diameter constructor.
     od_in = to_in(od).value
     id_in = to_in(id).value
-    od_in > id_in || throw(ArgumentError(
-        "Outer diameter ($od) must exceed inner diameter ($id). Invalid annular geometry."
-    ))
+    # Equal boundaries are a zero annulus (solid rod / no hole). Unit conversion
+    # is not bit-exact (139.7 mm → 5.499999999999999 in), so "equal" is judged
+    # with a 1e-9 relative tolerance: far below any quoted diameter resolution
+    # (0.001 in) and far above Float64 conversion noise (~1e-15).
+    isapprox(od_in, id_in; rtol=1e-9) && throw(ZeroCapacityError())
+    od_in < id_in && throw(NegativeValueError())       # inverted: negative annular area
 
     # Cross-sectional annular area: π/4 · (OD² − ID²) · (1 + washout) in in²,
     # then in² → m² (M_PER_IN²) and m²  ≡ m³/m → L/m (L_PER_M3)

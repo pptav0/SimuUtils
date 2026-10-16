@@ -4,7 +4,7 @@ using UomDefinitions: inch, mm, ft, m, bbl, m3, ltr,
     Diameter, IN, MM, d64, M_PER_IN, Length,
     Capacity, Volume, BBL_PER_FT, GAL_PER_FT, M3_PER_M, L_PER_M, BBL, M3, L,
     bbl_ft, gal_ft, m3_m, l_m, to_bbl_ft, to_l_m, to_m3_m, GAL_PER_BBL, L_PER_M3, M_PER_FT,
-    InvalidValueError, NegativeValueError
+    InvalidValueError, NegativeValueError, ZeroCapacityError
 
 # Reference geometry used throughout: 8.5" open hole around 5.0" casing.
 #   annulus  π/4 (8.5² − 5²) / 144 ft² = 0.257709 ft² = 0.045896 bbl/ft
@@ -154,23 +154,32 @@ end
 
 #===============================================================================#
 # Failure cases — rejected inputs and the error type each raises today          #
-#   od ≤ id and washout guards: ArgumentError (spec task 2.3 may move these to  #
-#   UomDefinitions error types); negative / non-finite diameters and lengths    #
-#   are rejected by the UomDefinitions constructors                             #
+#   od == id → ZeroCapacityError, od < id → NegativeValueError, non-finite xs → #
+#   InvalidValueError, xs out of range → ArgumentError (structural); negative /  #
+#   non-finite diameters and lengths are rejected by the constructors (D4)      #
 #===============================================================================#
 
-@testset "failure — invalid annular geometry" begin
-    @test_throws ArgumentError circle_capacity(D(0.0))
-    @test_throws NegativeValueError circle_capacity(D(-8.5))
-    @test_throws ArgumentError pipe_displacement(D(4.892), D(5.5))   # id larger than od
-    @test_throws ArgumentError pipe_capacity(D(0.0))
-    @test_throws ArgumentError hole_capacity(D(0.0))
-    # typed core: geometry rules with units compared in metres
-    @test_throws ArgumentError annulus_capacity(ID, OD)                                      # od < id
-    @test_throws ArgumentError annulus_capacity(Diameter(8.5, inch), Diameter(8.5, inch))
-    @test_throws ArgumentError annulus_capacity(Diameter(8.5, inch), Diameter(215.9, mm))   # equal after conversion
-    @test_throws ArgumentError annulus_capacity(Diameter(127.0, mm), Diameter(8.5, inch))   # od < id across units
-    @test_throws ArgumentError annulus_capacity(Diameter(0.0, inch))                         # zero od, full circle
+@testset "failure — invalid annular geometry (UomDefinitions error types)" begin
+    # od == id: zero annulus, in one unit and across units (conversion is not bit-exact)
+    @test_throws ZeroCapacityError annulus_capacity(OD, OD)
+    @test_throws ZeroCapacityError annulus_capacity(OD, Diameter(215.9, mm))
+    @test_throws ZeroCapacityError annulus_capacity(Diameter(215.9, mm), OD)
+    @test_throws ZeroCapacityError annulus_capacity(D(5.5), Diameter(139.7, mm))      # 139.7/25.4 ≠ 5.5 exactly in Float64
+    @test_throws ZeroCapacityError annulus_capacity(Diameter(139.7, mm), D(5.5))
+    @test_throws ZeroCapacityError annulus_capacity(D(3.5), Diameter(88.9, mm))
+    # zero diameter: no area
+    @test_throws ZeroCapacityError annulus_capacity(Diameter(0.0, inch))
+    @test_throws ZeroCapacityError circle_capacity(D(0.0))
+    @test_throws ZeroCapacityError hole_capacity(D(0.0))
+    @test_throws ZeroCapacityError pipe_capacity(D(0.0))
+    # od < id: negative annulus, in one unit and across units
+    @test_throws NegativeValueError annulus_capacity(ID, OD)
+    @test_throws NegativeValueError annulus_capacity(Diameter(127.0, mm), OD)
+    @test_throws NegativeValueError annulus_capacity(ID, Diameter(215.9, mm))
+    @test_throws NegativeValueError pipe_displacement(D(4.892), D(5.5))
+    # a genuinely thin annulus is still accepted (tolerance is 1e-9 relative, far below 0.001")
+    @test annulus_capacity(OD, D(8.499)).value > 0
+    @test annulus_capacity(OD, D(8.4999)).value > 0
 end
 
 @testset "failure — annulus_capacity and the oilfield wrappers have no untyped form" begin
@@ -203,13 +212,14 @@ end
     @test_throws InvalidValueError circle_capacity(D(Inf))
 end
 
-@testset "failure — washout factor outside [0, 1]" begin
+@testset "failure — washout factor non-finite or outside [0, 1]" begin
     @test_throws ArgumentError annulus_capacity(OD, ID; xs=1.5)
     @test_throws ArgumentError annulus_capacity(OD, ID; xs=1.0001)
     @test_throws ArgumentError circle_capacity(D(8.5); xs=-0.1)
     @test_throws ArgumentError hole_capacity(OD; xs=-1e-9)
-    @test_throws ArgumentError annulus_capacity(OD, ID; xs=NaN)
-    @test_throws ArgumentError annulus_capacity(OD, ID; xs=Inf)
+    @test_throws InvalidValueError annulus_capacity(OD, ID; xs=NaN)
+    @test_throws InvalidValueError annulus_capacity(OD, ID; xs=Inf)
+    @test_throws InvalidValueError hole_capacity(OD; xs=-Inf)
     # washout is not an accepted argument for steel or bore
     @test_throws MethodError pipe_capacity(D(4.892); xs=0.1)
     @test_throws MethodError pipe_displacement(D(5.5), D(4.892); xs=0.1)
