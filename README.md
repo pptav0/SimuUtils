@@ -19,22 +19,25 @@ Shared utilities for the Simulytics hydraulics-simulation platform: numeric help
 
 ```julia
 using SimuUtils
-using UomDefinitions: inch, mm, ft, m, l_m, m3_m, m3
+using UomDefinitions: Diameter, Length, inch, mm, ft, m, l_m, m3_m, m3
+
+# every physical input is a typed quantity; the unit travels with the value
+hole, csg = Diameter(8.5, inch), Diameter(5.0, inch)
 
 # annular capacity between an 8.5" hole and a 5" pipe (bbl/ft by default)
-cap    = annulus_capacity(8.5, 5.0)                 # 0.0459 bbl/ft
-cap_xs = annulus_capacity(8.5, 5.0; xs=0.2)         # with 20% excess
-annulus_capacity(215.9, 127.0; unit=mm, out=l_m)    # metric in, L/m out
-annulus_capacity(8.5, 5.0; out=m3_m).value          # cross-section area in m²
+cap    = annulus_capacity(hole, csg)                        # 0.0459 bbl/ft
+cap_xs = annulus_capacity(hole, csg; xs=0.2)                # with 20% excess
+annulus_capacity(hole, Diameter(127.0, mm); out=l_m)        # mixed units in, L/m out
+annulus_capacity(hole, csg; out=m3_m).value                 # cross-section area in m²
 
 # full circle (id = 0): open hole / pipe bore, and the steel wall
-hole_capacity(8.5)                                  # 0.0702 bbl/ft
-pipe_capacity(4.892)
-pipe_displacement(5.5, 4.892)
+hole_capacity(hole)                                         # 0.0702 bbl/ft
+pipe_capacity(Diameter(4.892, inch))
+pipe_displacement(Diameter(5.5, inch), Diameter(4.892, inch))
 
 # volumes: any capacity × length
-capacity_volume(cap, 5000.0)                        # 229.48 bbl
-annulus_volume(8.5, 5.0, 1524.0; length_unit=m, out=m3)
+capacity_volume(cap, Length(5000.0, ft))                    # 229.48 bbl
+annulus_volume(hole, csg, Length(1524.0, m); out=m3)
 
 # fit and plot experimental data
 slope, intercept = SimuUtils.linear_regression(X, Y)

@@ -223,10 +223,9 @@ quantities in the unit `out` (`bbl_ft`, `gal_ft`, `m3_m`, `l_m`).
 - `displace`: [`pipe_displacement`](@ref) of the steel wall.
 """
 function calc_capacity(csg::Casing; out::CapacityUnit=bbl_ft)
-    unit = _unit(csg.od)
-    external = hole_capacity(csg.od.value; unit=unit, out=out)
-    internal = pipe_capacity(csg.id.value; unit=unit, out=out)
-    displace = pipe_displacement(csg.od.value, csg.id.value; unit=unit, out=out)
+    external = hole_capacity(csg.od; out=out)
+    internal = pipe_capacity(csg.id; out=out)
+    displace = pipe_displacement(csg.od, csg.id; out=out)
 
     return (external=external, internal=internal, displace=displace)
 end
@@ -277,10 +276,9 @@ Typed form: the (3) capacities of a casing-in-casing pair as UomDefinitions
 - `displace`: [`pipe_displacement`](@ref) of the inner steel wall.
 """
 function calc_capacity(outer::Casing, inner::Casing; out::CapacityUnit=bbl_ft)
-    unit = _unit(inner.od)
     annular  = annulus_capacity(outer.id, inner.od; out=out)        # units may differ
-    internal = pipe_capacity(inner.id.value; unit=unit, out=out)
-    displace = pipe_displacement(inner.od.value, inner.id.value; unit=unit, out=out)
+    internal = pipe_capacity(inner.id; out=out)
+    displace = pipe_displacement(inner.od, inner.id; out=out)
 
     return (annular=annular, internal=internal, displace=displace)
 end

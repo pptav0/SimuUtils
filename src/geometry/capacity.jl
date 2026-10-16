@@ -9,13 +9,35 @@
 #   annulus_capacity(od::Diameter, id::Diameter)   typed core; od and id may
 #                                                  carry different units
 #   annulus_capacity(od::Diameter)                 full circle (id = 0)
-#   circle_capacity(d; unit)                       Real entry for id = 0 (tags d)
+#   circle_capacity(d::Diameter)                   explicit entry for id = 0
+#
+# Every physical input is a UomDefinitions quantity (`Diameter`, `Length`,
+# `Capacity`); there is no bare-number form anywhere in this file.
+#
+# Typed-parameter audit (2026-10-16) — every public function is fully typed;
+# ten method definitions, none with a bare-number physical parameter. The only
+# `Real` is the washout fraction `xs`, which is dimensionless by contract.
+#
+#   Function                         Physical inputs                 Dimensionless   Status
+#   annulus_capacity(od, id)         Diameter, Diameter              xs::Real        typed (core)
+#   annulus_capacity(od)             Diameter{U}                     xs::Real        typed
+#   circle_capacity(d)               Diameter                        xs::Real        typed
+#   hole_capacity(d)                 Diameter                        xs::Real        typed
+#   pipe_capacity(id)                Diameter                        —               typed
+#   pipe_displacement(od, id)        Diameter, Diameter              —               typed
+#   capacity_volume(cap, len)        Capacity, Length                —               typed
+#   annulus_volume(od, id, len)      Diameter, Diameter, Length      xs::Real        typed
+#   circle_volume(d, len)            Diameter, Length                xs::Real        typed
+#   _check_washout(xs)               —                               xs::Real        typed (private)
+#
+# Output units are chosen with a typed singleton keyword (`out::CapacityUnit`
+# or `out::VolumeUnit`); no `unit=` / `length_unit=` input keyword exists.
 #
 # The oilfield-named wrappers (`hole_capacity`, `pipe_capacity`,
-# `pipe_displacement`) only fix the semantics and which arguments make sense
-# (e.g. washout never applies to steel). All of them return a UomDefinitions
-# `Capacity{U}` whose unit is chosen with the `out` keyword, and the
-# cross-sectional area is the `m3_m` capacity read as m².
+# `pipe_displacement`) take `Diameter`s only and fix the semantics and which
+# arguments make sense (e.g. washout never applies to steel). All of them
+# return a UomDefinitions `Capacity{U}` whose unit is chosen with the `out`
+# keyword, and the cross-sectional area is the `m3_m` capacity read as m².
 
 # Shared argument check for the washout / excess factor
 function _check_washout(xs::Real)
@@ -28,10 +50,7 @@ end
 # Generic geometries
 # ================================================================================
 """
-    circle_capacity(d::Real;
-                    unit::DiameterUnit = inch,
-                    xs::Real = 0.0,
-                    out::CapacityUnit = bbl_ft) -> Capacity
+    circle_capacity(d::Diameter; xs::Real = 0.0, out::CapacityUnit = bbl_ft) -> Capacity
 
 Capacity (volume per unit length) of a full circle of diameter `d`,
 i.e. the non-annular case: an open hole or the inside of a pipe.
@@ -39,9 +58,8 @@ i.e. the non-annular case: an open hole or the inside of a pipe.
 The area is computed as `π/4 * d²` with optional washout excess.
 
 # Arguments
-- `d::Real`: Diameter of the circle (hole size or pipe ID) [in/mm]
-- `unit::DiameterUnit = inch`: Unit of the input diameter (`inch` or `mm` singletons from UomDefinitions)
-- `xs::Real = 0.0`: Washout/excess area factor as percentage (0.0–1.0).
+- `d::Diameter`: Diameter of the circle (hole size or pipe ID); the unit travels with it
+- `xs::Real = 0.0`: Washout/excess area factor as a fraction (0.0–1.0).
     Accounts for hole enlargement beyond nominal diameter.
 - `out::CapacityUnit = bbl_ft`: Output unit singleton from UomDefinitions:
     `bbl_ft`, `gal_ft`, `m3_m` or `l_m`.
@@ -53,31 +71,30 @@ number is `.value`; convert later with `to_l_m`, `to_gal_ft`, … or
 capacity in m² (`to_m3_m(cap).value`).
 
 # Throws
-- `NegativeValueError` / `InvalidValueError`: If `d` is negative or non-finite (raised by `Diameter`)
+- `NegativeValueError` / `InvalidValueError`: raised by `Diameter` for a negative or non-finite value
 - `ArgumentError`: If `d == 0` (no area)
 - `ArgumentError`: If `xs ∉ [0.0, 1.0]` (invalid washout factor)
+- `MethodError`: If a bare number is passed instead of a `Diameter`
 
-Equivalent to `annulus_capacity(Diameter(d, unit); …)`; provided so the intent
-reads at the call site.
+Equivalent to the single-`Diameter` form of [`annulus_capacity`](@ref); provided
+so the intent reads at the call site.
 
 # Examples
 ```julia
-circle_capacity(8.5; unit=inch)              # 0.0702 bbl/ft (8.5" open hole)
-circle_capacity(4.892; unit=inch, out=l_m)   # 12.12 L/m   (5.5" 17# casing ID)
+circle_capacity(Diameter(8.5, inch))               # 0.0702 bbl/ft (8.5" open hole)
+circle_capacity(Diameter(4.892, inch); out=l_m)    # 12.13 L/m   (5.5" 17# casing ID)
+circle_capacity(Diameter(215.9, mm); xs=0.10)      # 10 % washout
 ```
 
 # See Also
 [`hole_capacity`](@ref), [`pipe_capacity`](@ref), [`annulus_capacity`](@ref)
 """
 function circle_capacity(
-    d::Real;
-    unit::DiameterUnit = inch,
+    d::Diameter;
     xs::Real = 0.0,
     out::CapacityUnit = bbl_ft
 )
-    # Validate inputs
-    # -----------------
-    return annulus_capacity(Diameter(d, unit); xs=xs, out=out)
+    return annulus_capacity(d; xs=xs, out=out)
 end
 
 """
@@ -90,7 +107,7 @@ other capacity function reduces to it.
 
 The typed form takes UomDefinitions `Diameter` quantities, so each diameter
 carries its own unit and **`od` and `id` may be in different units** (an 8.5 in
-hole around a 127 mm casing is fine): both are converted to metres before the
+hole around a 127 mm casing is fine): both are converted to inches before the
 comparison and the area. A single `Diameter` is the full circle (`id = 0` in
 `od`'s unit). There is no untyped form: callers tag their numbers with
 `Diameter(value, unit)`.
@@ -115,7 +132,7 @@ the cross-sectional area is numerically the `m3_m` capacity in m²
 
 # Throws
 - `NegativeValueError` / `InvalidValueError`: negative or non-finite diameters (raised by `Diameter`)
-- `ArgumentError`: If `od ≤ id` after conversion to metres (invalid annular geometry)
+- `ArgumentError`: If `od ≤ id` after conversion to inches (invalid annular geometry)
 - `ArgumentError`: If `xs ∉ [0.0, 1.0]`
 - `MethodError`: If a bare number is passed instead of a `Diameter`
 - `TypeError`: If `out` is not a `CapacityUnit` singleton
@@ -163,129 +180,140 @@ annulus_capacity(od::Diameter{U}; xs::Real = 0.0, out::CapacityUnit = bbl_ft) wh
 # Oilfield-named wrappers
 # ================================================================================
 """
-    hole_capacity(d::Real; unit=inch, xs=0.0, out=bbl_ft) -> Capacity
+    hole_capacity(d::Diameter; xs=0.0, out=bbl_ft) -> Capacity
 
 Open-hole capacity: a full circle of hole size `d`, with optional washout
-`xs`. Thin wrapper over [`circle_capacity`](@ref).
+`xs`. Thin wrapper over the single-`Diameter` form of [`annulus_capacity`](@ref).
+
+```julia
+hole_capacity(Diameter(8.5, inch))             # 0.0702 bbl/ft
+hole_capacity(Diameter(215.9, mm); xs=0.10)    # 10 % washout
+```
 """
-hole_capacity(d::Real; unit::DiameterUnit = inch, xs::Real = 0.0, out::CapacityUnit = bbl_ft) =
-    circle_capacity(d; unit=unit, xs=xs, out=out)
+hole_capacity(d::Diameter; xs::Real = 0.0, out::CapacityUnit = bbl_ft) =
+    annulus_capacity(d; xs=xs, out=out)
 
 """
-    pipe_capacity(id::Real; unit=inch, out=bbl_ft) -> Capacity
+    pipe_capacity(id::Diameter; out=bbl_ft) -> Capacity
 
 Internal capacity of a pipe (casing, tubing, drill pipe) from its inner
 diameter `id`. A full circle; washout does not apply to a pipe bore.
-Thin wrapper over [`circle_capacity`](@ref).
+Thin wrapper over the single-`Diameter` form of [`annulus_capacity`](@ref).
+
+```julia
+pipe_capacity(Diameter(4.892, inch))           # 0.0232 bbl/ft (5.5" 17# casing)
+pipe_capacity(Diameter(124.26, mm); out=l_m)   # 12.13 L/m
+```
 """
-pipe_capacity(id::Real; unit::DiameterUnit = inch, out::CapacityUnit = bbl_ft) =
-    circle_capacity(id; unit=unit, xs=0.0, out=out)
+pipe_capacity(id::Diameter; out::CapacityUnit = bbl_ft) =
+    annulus_capacity(id; xs=0.0, out=out)
 
 """
-    pipe_displacement(od::Real, id::Real; unit=inch, out=bbl_ft) -> Capacity
+    pipe_displacement(od::Diameter, id::Diameter; out=bbl_ft) -> Capacity
 
 Steel displacement of a pipe per unit length, from its outer diameter `od`
 and inner diameter `id` (the wall cross-section). Washout does not apply.
-Thin wrapper over [`annulus_capacity`](@ref).
+`od` and `id` may carry different units. Thin wrapper over [`annulus_capacity`](@ref).
+
+```julia
+pipe_displacement(Diameter(5.5, inch), Diameter(4.892, inch))   # 0.0061 bbl/ft
+```
 """
-pipe_displacement(od::Real, id::Real; unit::DiameterUnit = inch, out::CapacityUnit = bbl_ft) =
-    annulus_capacity(Diameter(od, unit), Diameter(id, unit); xs=0.0, out=out)
+pipe_displacement(od::Diameter, id::Diameter; out::CapacityUnit = bbl_ft) =
+    annulus_capacity(od, id; xs=0.0, out=out)
 
 # ================================================================================
 # Volumes
 # ================================================================================
 """
-    capacity_volume(cap::Capacity, length_val::Real;
-                    length_unit::LengthUnit = ft,
-                    out::VolumeUnit = bbl) -> Volume
+    capacity_volume(cap::Capacity, len::Length; out::VolumeUnit = bbl) -> Volume
 
-Total volume of any capacity over an axial length: `cap × length`.
+Total volume of any capacity over an axial length: `cap × len`.
 
 Works with the result of every capacity function above, so there is a single
-volume routine instead of one per geometry.
+volume routine instead of one per geometry. Both inputs are UomDefinitions
+quantities, so each carries its own unit; there is no bare-number form.
 
 # Arguments
 - `cap::Capacity`: Capacity per unit length (any unit)
-- `length_val::Real`: Axial length
-- `length_unit::LengthUnit = ft`: Unit for length (`ft` or `m`)
+- `len::Length`: Axial length (`ft` or `m`)
 - `out::VolumeUnit = bbl`: Output unit singleton: `bbl`, `m3` or `ltr`
 
 # Returns
 A UomDefinitions `Volume{U}` tagged with the requested unit. Convert later
 with `to_bbl`, `to_m3`, `to_ltr` or `to_unit(vol, unit)`.
 
+# Throws
+- `NegativeValueError` / `InvalidValueError`: raised by `Length` for a negative or non-finite length
+- `MethodError`: If a bare number is passed instead of a `Length`
+- `TypeError`: If `out` is not a `VolumeUnit` singleton
+
 # Examples
 ```julia
-capacity_volume(annulus_capacity(8.5, 5.0), 5000.0)                    # 229.48 bbl
-capacity_volume(pipe_capacity(4.892), 1524.0; length_unit=m, out=m3)   # 18.48 m³
+capacity_volume(annulus_capacity(Diameter(8.5, inch), Diameter(5.0, inch)), Length(5000.0, ft))   # 229.48 bbl
+capacity_volume(pipe_capacity(Diameter(4.892, inch)), Length(1524.0, m); out=m3)                 # 18.48 m³
 ```
 """
 function capacity_volume(
-    cap::Capacity, length_val::Real;
-    length_unit::LengthUnit = ft,
+    cap::Capacity, len::Length;
     out::VolumeUnit = bbl
 )
-    # Convert capacity to m³/m and length to meters for calculation
-    cap_m3_m = to_m3_m(cap).value
-    length_m = to_m(Length(length_val, length_unit)).value
+    # Convert capacity to L/m and length to metres for calculation
+    cap_ltr_m = to_l_m(cap).value
+    length_m = to_m(len).value
 
-    # Total volume [m³] by scaling the per-meter capacity, then tag it as a
+    # Total volume [L] by scaling the per-metre capacity, then tag it as a
     # UomDefinitions `Volume` and convert to the requested output unit
-    total_m3 = cap_m3_m * length_m
+    total_ltr = cap_ltr_m * length_m
 
-    return to_unit(Volume(total_m3, m3), out)
+    return to_unit(Volume(total_ltr, ltr), out)
 end
 
 """
-    annulus_volume(od::Real, id::Real, length_val::Real;
-                   unit::DiameterUnit = inch,
-                   length_unit::LengthUnit = ft,
-                   xs::Real = 0.0,
-                   out::VolumeUnit = bbl) -> Volume
+    annulus_volume(od::Diameter, id::Diameter, len::Length;
+                   xs::Real = 0.0, out::VolumeUnit = bbl) -> Volume
 
-Calculate total annular volume for a given axial length.
+Total annular volume over an axial length `len`.
 
 Wraps [`annulus_capacity`](@ref) and [`capacity_volume`](@ref) to compute
-full volumes rather than per-length rates.
+full volumes rather than per-length rates. `od` and `id` may carry different
+units; `len` carries its own.
 
 # Arguments
-- `od::Real`: Outer diameter [in/mm]
-- `id::Real`: Inner diameter [in/mm]
-- `length_val::Real`: Axial length of the annulus
-- `unit::DiameterUnit`: Unit for diameters (default: inches)
-- `length_unit::LengthUnit`: Unit for length (default: feet)
-- `xs::Real = 0.0`: Washout factor
+- `od::Diameter`: Outer boundary (hole size, outer casing ID)
+- `id::Diameter`: Inner boundary (inner casing OD)
+- `len::Length`: Axial length of the annulus (`ft` or `m`)
+- `xs::Real = 0.0`: Washout factor, `0.0 ≤ xs ≤ 1.0`
 - `out::VolumeUnit = bbl`: Output unit singleton: `bbl`, `m3` or `ltr`
 
 # Returns
 A UomDefinitions `Volume{U}` tagged with the requested unit.
 
+# Throws
+As [`annulus_capacity`](@ref) and [`capacity_volume`](@ref); `MethodError` for any bare number.
+
 # Examples
 ```julia
-# 5000 ft of 8.5\"x5.0\" annulus
-annulus_volume(8.5, 5.0, 5000.0; unit=inch, length_unit=ft)           # 229.48 bbl
-annulus_volume(8.5, 5.0, 1524.0; unit=inch, length_unit=m, out=m3)    # 36.49 m³
+# 5000 ft of 8.5" x 5.0" annulus
+annulus_volume(Diameter(8.5, inch), Diameter(5.0, inch), Length(5000.0, ft))            # 229.48 bbl
+annulus_volume(Diameter(215.9, mm), Diameter(127.0, mm), Length(1524.0, m); out=m3)     # 36.49 m³
 ```
 """
-annulus_volume(od::Real, id::Real, length_val::Real;
-               unit::DiameterUnit = inch, length_unit::LengthUnit = ft,
+annulus_volume(od::Diameter, id::Diameter, len::Length;
                xs::Real = 0.0, out::VolumeUnit = bbl) =
-    capacity_volume(annulus_capacity(Diameter(od, unit), Diameter(id, unit); xs=xs), length_val;
-                    length_unit=length_unit, out=out)
+    capacity_volume(annulus_capacity(od, id; xs=xs), len; out=out)
 
 """
-    circle_volume(d::Real, length_val::Real;
-                  unit::DiameterUnit = inch,
-                  length_unit::LengthUnit = ft,
-                  xs::Real = 0.0,
-                  out::VolumeUnit = bbl) -> Volume
+    circle_volume(d::Diameter, len::Length; xs::Real = 0.0, out::VolumeUnit = bbl) -> Volume
 
 Total volume of a full circle (open hole or pipe bore) over an axial length.
 Wraps [`circle_capacity`](@ref) and [`capacity_volume`](@ref); arguments as
 in [`annulus_volume`](@ref).
+
+```julia
+circle_volume(Diameter(8.5, inch), Length(1000.0, ft))          # 70.19 bbl
+```
 """
-circle_volume(d::Real, length_val::Real;
-              unit::DiameterUnit = inch, length_unit::LengthUnit = ft,
+circle_volume(d::Diameter, len::Length;
               xs::Real = 0.0, out::VolumeUnit = bbl) =
-    capacity_volume(circle_capacity(d; unit=unit, xs=xs), length_val;
-                    length_unit=length_unit, out=out)
+    capacity_volume(circle_capacity(d; xs=xs), len; out=out)
