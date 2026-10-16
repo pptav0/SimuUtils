@@ -3,20 +3,6 @@
 # 	* Defined datatypes
 #
 # ----------------------------------------
-#
-# Typed-parameter contract (spec D2): every physical input is a UomDefinitions
-# quantity — diameters `Diameter`, depths `Length`, ratings `Pressure`,
-# material density `Density` (any unit; converted to lb/ft³ internally) and
-# nominal weight `CsgWeight{PPF}` (lb/ft, validated). `CsgWeightUnit`/`PPF`
-# follow the UomDefinitions unit pattern (unit singleton + parametric quantity
-# with a validating inner constructor) but live here, without conversions,
-# until UomDefinitions gains a linear-weight family. The only `Real`
-# parameters left are the quantity-constructor values (`CsgWeight{U}(value::Real)`,
-# exactly as UomDefinitions constructors take a `Real`) and `Thread.yield`
-# (plain number, kips).
-# Validation (D4/D10): the single `new` site is the `Casing{T}` inner
-# constructor; errors are UomDefinitions types except for structural
-# problems (`hanger` below `depth`, empty thread name) which are `ArgumentError`.
 
 # ===== Casing-weight units (UomDefinitions pattern, no conversions yet) =====
 abstract type CsgWeightUnit <: Uom end
