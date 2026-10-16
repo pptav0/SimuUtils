@@ -1,8 +1,7 @@
-# modules
-using CairoMakie, MakieThemes;
-using LaTeXStrings;
+# Well schematic (body of SimuUtils.plot_well_schem). CairoMakie, MakieThemes
+# and LaTeXStrings come from the SimuUtilsMakieExt module that includes this file.
 
-Makie.set_theme!(ggthemr(:fresh))
+Makie.set_theme!(ggthemr(:fresh))        # runs when the extension loads (as before)
 
 
 # Helper functions

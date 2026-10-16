@@ -69,12 +69,25 @@ end
     @test _includes(joinpath(SRC, "oilfield", "oilfield.jl")) == ["casings.jl", "rheos.jl", "fluids.jl"]
 end
 
-@testset "plots/ — files exist; the schematic lives here" begin
-    for f in ["plots.jl", "wellbore.jl", "regression.jl", "rheology.jl"]
-        @test isfile(joinpath(SRC, "plots", f))
+@testset "plots/ — only the stubs live in src; bodies are the SimuUtilsMakieExt extension" begin
+    @test isfile(joinpath(SRC, "plots", "plots.jl"))
+    @test sort(basename.(_files("plots"))) == ["plots.jl"]
+    for f in ["SimuUtilsMakieExt.jl", "wellbore.jl", "regression.jl", "rheology.jl"]
+        @test isfile(normpath(joinpath(SRC, "..", "ext", f)))
     end
-    @test _mentions(joinpath(SRC, "plots", "wellbore.jl"), ["plot_well_schem"]) == ["plot_well_schem"]
-    @test isdefined(SimuUtils, :plot_well_schem)
+    for s in (:plot_well_schem, :plot_regression, :plot_rheology)
+        @test isdefined(SimuUtils, s)
+    end
+    # no Makie name anywhere under src/ — plotting is optional (spec D5); the
+    # stub file plots/plots.jl is exempt because its docstrings name the triggers
+    for dir in ["helpers", "geometry", "oilfield", "plots"], path in _files(dir)
+        basename(path) == "plots.jl" && continue
+        @test _mentions(path, ["CairoMakie", "Makie", "MakieThemes"]) == []
+    end
+    stubs = read(joinpath(SRC, "plots", "plots.jl"), String)          # docstrings only: no code may touch Makie
+    @test !occursin(r"^\s*(using|import)\s+\w*Makie"m, stubs)
+    @test !occursin(r"\bMakie\.", stubs)
+    @test _mentions(joinpath(SRC, "SimuUtils.jl"), ["CairoMakie", "MakieThemes"]) == []
 end
 
 @testset "SimuUtils.jl — includes exactly the four folder indexes; every export is defined" begin

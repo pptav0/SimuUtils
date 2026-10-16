@@ -4,9 +4,9 @@ using Printf
 using LaTeXStrings
 # Units of measure: all unit types, singletons, constants and `to_*`
 # conversions come from UomDefinitions (no local unit definitions).
-# The names used here are imported explicitly because Makie (loaded in
-# plots/wellbore.jl) also exports `Density` and `Volume`; an explicit import
-# takes precedence over the conflicting `using` exports.
+# The names used here are listed explicitly as documentation of the units
+# contract; plotting backends no longer load here (see plots/plots.jl), so
+# there is no name clash to resolve.
 using UomDefinitions
 import UomDefinitions:
     DiameterUnit, Diameter, IN, MM, D64, inch, mm, d64, to_in, to_mm,

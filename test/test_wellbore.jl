@@ -2,7 +2,21 @@ using Test
 using SimuUtils
 
 using UomDefinitions: Diameter, Length, inch, ft
-import Makie.Figure
+
+# Plotting lives in the SimuUtilsMakieExt extension; its triggers are test-target
+# dependencies, visible under `Pkg.test()` but not under `julia --project=.`.
+const WELLBORE_MAKIE_AVAILABLE = Base.identify_package("CairoMakie") !== nothing &&
+                                 Base.identify_package("MakieThemes") !== nothing
+
+if !WELLBORE_MAKIE_AVAILABLE
+    @warn "CairoMakie/MakieThemes are not in the active environment; the well-schematic plot test is skipped — run `Pkg.test()` for the full suite"
+    @testset "Well Schematic Plot (skipped: CairoMakie/MakieThemes unavailable)" begin
+        @test_skip WELLBORE_MAKIE_AVAILABLE
+    end
+else
+
+using CairoMakie, MakieThemes
+using CairoMakie: Figure
 
 # Tests for src/plots/wellbore.jl (plot_well_schem). Casing itself is
 # tested in test_casings.jl.
@@ -25,3 +39,5 @@ inner_casings_test = Casing[
         airgap=50.0, water_depth=500.0, units=ft)
     @test fig isa Figure
 end
+
+end # WELLBORE_MAKIE_AVAILABLE
