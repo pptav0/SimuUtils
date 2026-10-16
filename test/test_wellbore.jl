@@ -4,7 +4,7 @@ using SimuUtils
 using UomDefinitions: Diameter, Length, inch, ft
 import Makie.Figure
 
-# Tests for src/oilfield/wellbore.jl (plot_well_schem). Casing itself is
+# Tests for src/plots/wellbore.jl (plot_well_schem). Casing itself is
 # tested in test_casings.jl.
 
 # Define test casings (typed quantities only)
