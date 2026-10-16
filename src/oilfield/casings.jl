@@ -3,90 +3,93 @@
 # 	* Defined datatypes
 #
 # ----------------------------------------
+#
+# Typed-parameter contract (spec D2): every physical input is a UomDefinitions
+# quantity — diameters `Diameter`, depths `Length`, ratings `Pressure`,
+# material density `Density` (any unit; converted to lb/ft³ internally). The
+# only `Real` parameters are `weight_ppf` (lb/ft, no UomDefinitions family yet)
+# and `Thread.yield` (plain number).
+# Validation (D4/D10): the single `new` site is the `Casing{T}` inner
+# constructor; errors are UomDefinitions types except for structural
+# problems (`hanger` below `depth`, empty thread name) which are `ArgumentError`.
 
 @enum CsgWeight begin
     PPF  # lb/ft
 end
 
-const STEEL_DENSITY = 490.0 # lb/ft^3
+"Carbon-steel density used for nominal casing weights (490 lb/ft³ ≈ 7849 kg/m³)."
+const STEEL_DENSITY = Density(490.0, ppcf)
 
+# Material density in lb/ft³; `Density` already rejects non-finite and negative values
+function _ppcf(material::Density)
+    ρ = to_ppcf(material).value
+    iszero(ρ) && throw(ZeroValueError())
+    return ρ
+end
+
+# Unit singleton of a Casing diameter (`Diameter{IN}` -> `inch`, …)
+_unit(::Diameter{U}) where {U} = U()
+
+# A foot length expressed as a Diameter in the unit of `u`
+_as_diameter(l::Length, ::IN)  = to_in(l)
+_as_diameter(l::Length, ::MM)  = to_mm(l)
+_as_diameter(l::Length, ::D64) = to_d64(to_in(l))
 
 # ----------------------------------------
 #
 # 	* Specific Helper functions
 #
 # ----------------------------------------
-#
-# Diameter <-> feet conversions come from UomDefinitions (`to_ft(::Diameter)`,
-# `to_in(::Length)`, `to_mm(::Length)`), so the 12 in/ft and 304.8 mm/ft
-# factors live in one place (`IN_PER_FT`, `MM_PER_FT`).
-
-# Function to convert diameter to feet
-to_feet(diameter::T, unit::DiameterUnit) where {T<:Union{Float64,Float32}} =
-    to_ft(Diameter(diameter, unit)).value
-
-# Function to convert diameter from feet to the original unit
-from_feet(diameter_ft::T, ::IN) where {T<:Union{Float64,Float32}} = to_in(Length(diameter_ft, ft)).value
-from_feet(diameter_ft::T, ::MM) where {T<:Union{Float64,Float32}} = to_mm(Length(diameter_ft, ft)).value
 
 """
-	calculate_casing_weight(
-		od::T, id::T, unit::DiameterUnit;
-		material::T=STEEL_DENSITY) where T<:Union{Float64, Float32}
+    calc_casing_weight(od::Diameter, id::Diameter; material::Density=STEEL_DENSITY) -> Float64
 
-Function to calculate the weight of the casing in ppf (lb/ft)
+Nominal weight of the casing wall in ppf (lb/ft), no rounding. The two
+diameters may use different units. The steel area comes from the geometry
+core ([`pipe_displacement`](@ref)).
 
 # Arguments
-   - `od::T`: Outer diameter of the casing [in or mm].
-   - `id::T`: Inner diameter of the casing [in or mm].
-   - `unit::DiameterUnit`: The unit of the diameters (`inch` or `mm`).
-   - `material::T=STEEL_DENSITY`: The density of the material in lb/ft^3. Defaults to STEEL_DENSITY.
+- `od::Diameter`: Outer diameter of the casing.
+- `id::Diameter`: Inner diameter of the casing.
+- `material::Density=STEEL_DENSITY`: Density of the material, any unit (`ppcf`, `kg_m3`, `sg`, `ppg`).
 
-# Returns
-   - `weight_ppf::T`: The weight of the casing in lb/ft.
+# Throws
+- `ZeroCapacityError` if `od == id`; `NegativeValueError` if `od < id` (from the geometry core).
+- `ZeroValueError` for a zero `material` (non-finite / negative densities are rejected by `Density` itself).
 """
-function calc_casing_weight(
-    od::T, id::T, unit::DiameterUnit;
-    material::T=STEEL_DENSITY) where {T<:Union{Float64,Float32}}
-
-    # Convert od and id to feet
-    od_ft = to_feet(od, unit)
-    id_ft = to_feet(id, unit)
-
-    # Calculate the weight in lb/ft (ppf)
-    weight_ppf = (π / 4) * (od_ft^2 - id_ft^2) * material
-
-    return round(weight_ppf, digits=2)
+function calc_casing_weight(od::Diameter, id::Diameter; material::Density=STEEL_DENSITY)
+    steel_ft2 = pipe_displacement(od, id; out=ft3_ft).value   # ft³/ft == ft²
+    return steel_ft2 * _ppcf(material)                        # ft² × lb/ft³ = lb/ft
 end
 
 """
-    calc_casing_id(
-        od::T, weight_ppf::T, unit::DiameterUnit;
-        material::T=STEEL_DENSITY) where T<:Union{Float64, Float32}
+    calc_casing_id(od::Diameter, weight_ppf::Real; material::Density=STEEL_DENSITY) -> Diameter
 
-Function to calculate the inner diameter of the casing given the outer diameter and weight in ppf.
+Inner diameter of a casing from its outer diameter and nominal weight, returned
+in the unit of `od`, no rounding.
 
 # Arguments
-   - `od::T`: Outer diameter of the casing [in or mm].
-   - `weight_ppf::T`: The weight of the casing in lb/ft.
-   - `unit::DiameterUnit`: The unit of measurement for the diameters (`inch` or `mm`).
-   - `material::T=STEEL_DENSITY`: The density of the material in lb/ft^3. Defaults to STEEL_DENSITY.
+- `od::Diameter`: Outer diameter of the casing.
+- `weight_ppf::Real`: Nominal weight in lb/ft.
+- `material::Density=STEEL_DENSITY`: Density of the material, any unit.
 
-# Returns
-   - `id::T`: The inner diameter of the casing [in or mm].
+# Throws
+- `InvalidValueError` / `NegativeValueError` / `ZeroValueError` for a non-finite, negative or zero `weight_ppf`.
+- `ZeroValueError` for a zero `material` (non-finite / negative densities are rejected by `Density` itself).
+- `NegativeValueError` if the weight exceeds a solid bar of diameter `od` (no real bore).
+- `ZeroCapacityError` if the weight equals a solid bar (bore would be zero).
 """
-function calc_casing_id(
-    od::T, weight_ppf::T, unit::DiameterUnit;
-    material::T=STEEL_DENSITY) where {T<:Union{Float64,Float32}}
+function calc_casing_id(od::Diameter, weight_ppf::Real; material::Density=STEEL_DENSITY)
+    validate_positive_value(weight_ppf)
+    ρ = _ppcf(material)
 
-    # Convert od to feet
-    od_ft = to_feet(od, unit)
+    od_ft = to_ft(od).value
+    radicand = od_ft^2 - (4 / π) * (weight_ppf / ρ)
+    # a solid bar gives a radicand of ~1e-16, not exactly zero: same 1e-9 relative rule as the diameter check
+    isapprox(radicand, 0.0; atol=1e-9 * od_ft^2) && throw(ZeroCapacityError())
+    radicand < 0 && throw(NegativeValueError())
 
-    # Calculate id in feet
-    id_ft = sqrt(od_ft^2 - ((4 / π) * (weight_ppf / material)))
-
-    # Convert id back to the original unit
-    return round(from_feet(id_ft, unit), digits=3)
+    return _as_diameter(Length(sqrt(radicand), ft), _unit(od))
 end
 
 # ----------------------------------------
@@ -95,19 +98,44 @@ end
 #
 # ----------------------------------------
 
-struct Thread{T<:Float64}
+"""
+    Thread(name::AbstractString, yield::Real)
+
+Casing connection: thread `name` and its `yield` strength (plain number, kips).
+
+# Throws
+- `ArgumentError` for an empty `name`.
+- `InvalidValueError` / `NegativeValueError` / `ZeroValueError` for a non-finite, negative or zero `yield`.
+"""
+struct Thread
     name::String
-    yield::T
+    yield::Float64
+
+    function Thread(name::AbstractString, yield::Real)
+        isempty(name) && throw(ArgumentError("Thread name cannot be empty"))
+        validate_positive_value(yield)
+        new(String(name), Float64(yield))
+    end
 end
 
 """
     Casing{T}
 
-Casing section. Diameters are stored as UomDefinitions `Diameter` quantities
-and depths as `Length` quantities, so the unit travels with the value
-(`csg.od.value`, `csg.depth.value`).
+Casing section. Diameters are stored as UomDefinitions `Diameter` quantities,
+depths as `Length` quantities and burst/collapse ratings as `Pressure`
+quantities, so the unit travels with the value (`csg.od.value`, `csg.depth.value`).
+
+The inner constructor is the single validation point:
+- `od > id` after converting both to inches (`ZeroCapacityError` if equal,
+  `NegativeValueError` if smaller);
+- `wt[1]` finite and positive (`InvalidValueError` / `NegativeValueError` / `ZeroValueError`);
+- `hanger ≤ depth` when both are given, compared in metres (`ArgumentError`);
+- `burst` / `collapse` non-negative when given (`NegativeValueError`).
+
+An `id` of zero (solid bar) and `D64` diameters are accepted here; the
+capacity functions raise `ZeroCapacityError` for a zero bore.
 """
-mutable struct Casing{T<:Union{Float64}}
+mutable struct Casing{T<:Float64}
     od::Diameter
     id::Diameter
     wt::Tuple{T,CsgWeight}
@@ -115,107 +143,66 @@ mutable struct Casing{T<:Union{Float64}}
     depth::Union{Nothing,Length}
     thread::Union{Nothing,Thread}
     grade::Union{Nothing,String}
-    burst::Union{Nothing,T}
-    collapse::Union{Nothing,T}
+    burst::Union{Nothing,Pressure}
+    collapse::Union{Nothing,Pressure}
+
+    function Casing{T}(
+        od::Diameter, id::Diameter, wt::Tuple{T,CsgWeight},
+        hanger::Union{Nothing,Length}, depth::Union{Nothing,Length},
+        thread::Union{Nothing,Thread}, grade::Union{Nothing,AbstractString},
+        burst::Union{Nothing,Pressure}, collapse::Union{Nothing,Pressure}) where {T<:Float64}
+
+        od_in, id_in = to_in(od).value, to_in(id).value
+        isapprox(od_in, id_in; rtol=1e-9) && throw(ZeroCapacityError())   # conversion is not bit-exact
+        od_in < id_in && throw(NegativeValueError())
+
+        validate_positive_value(wt[1])
+
+        if !isnothing(hanger) && !isnothing(depth)
+            h, d = to_m(hanger).value, to_m(depth).value
+            h > d && !isapprox(h, d; rtol=1e-9) &&
+                throw(ArgumentError("Hanger cannot be deeper than Casing depth"))
+        end
+
+        !isnothing(burst)    && burst.value    < 0 && throw(NegativeValueError())
+        !isnothing(collapse) && collapse.value < 0 && throw(NegativeValueError())
+
+        new{T}(od, id, wt, hanger, depth, thread,
+               isnothing(grade) ? nothing : String(grade), burst, collapse)
+    end
 end
 
-# Accept either a typed `Length` or the legacy `(value, unit)` tuple for depths.
-_as_length(x::Nothing) = nothing
-_as_length(x::Length)  = x
-_as_length(x::Tuple{<:Real,<:LengthUnit}) = Length(x[1], x[2])
-
-
 """
-    Casing(
-		od::T, id::T, units::DiameterUnit;
-		hanger::Union{Nothing, Length, Tuple{Real, LengthUnit}}=nothing,
-		depth::Union{Nothing, Length, Tuple{Real, LengthUnit}}=nothing)
-		where T<:Union{Float64, Float32}
+    Casing(od::Diameter, id::Diameter;
+        hanger::Union{Nothing,Length}=nothing, depth::Union{Nothing,Length}=nothing,
+        thread::Union{Nothing,Thread}=nothing, grade::Union{Nothing,AbstractString}=nothing,
+        burst::Union{Nothing,Pressure}=nothing, collapse::Union{Nothing,Pressure}=nothing)
 
-Constructor given `od` and `id` inputs. `depth` and other `Casing` properties are optional.
+Ergonomic constructor: computes the nominal weight `wt` in ppf from `od` and `id`
+([`calc_casing_weight`](@ref)) and delegates every check to the inner constructor.
+`od` and `id` may use different diameter units; `hanger` and `depth` different length units.
 
 # Arguments
-- `od::T`: The outer diameter of the casing [in or mm].
-- `id::T`: The inner diameter of the casing [in or mm].
-- `units::DiameterUnit`: The unit of measurement for the diameter inputs (`inch` or `mm`).
-- `hanger`: The hanger depth of the casing, as `Length(x, ft|m)` or `(x, ft|m)`.
-- `depth`: The depth of the casing [ft or m], as `Length(x, ft|m)` or `(x, ft|m)`.
-
-# Result
-- `Casing{T}`: The constructed `Casing` object.
+- `od::Diameter`, `id::Diameter`: Outer and inner diameters.
+- `hanger`, `depth`: Hanger and setting depths as `Length`.
+- `thread`, `grade`: Connection and steel grade.
+- `burst`, `collapse`: Pressure ratings as `Pressure`.
 """
 function Casing(
-    od::T, id::T, units::DiameterUnit=inch;
-    hanger=nothing, depth=nothing) where {T<:Union{Float64,Float32}}
+    od::Diameter, id::Diameter;
+    hanger::Union{Nothing,Length}=nothing, depth::Union{Nothing,Length}=nothing,
+    thread::Union{Nothing,Thread}=nothing, grade::Union{Nothing,AbstractString}=nothing,
+    burst::Union{Nothing,Pressure}=nothing, collapse::Union{Nothing,Pressure}=nothing)
 
-    hanger = _as_length(hanger)
-    depth  = _as_length(depth)
-
-    # Assert Inputs diameters and depths
-    if od <= id
-        throw(ArgumentError("Outer diameter must be larger than inner diameter"))
-    end
-    if !isnothing(hanger) && !isnothing(depth) && hanger.value > depth.value
-        throw(ArgumentError("Hanger cannot be deeper than Casing depth"))
-    end
-
-    # Calculate the wall thickness of the casing
-    wt = calc_casing_weight(od, id, units)
-
-    Casing{Float64}(
-        Diameter(od, units), Diameter(id, units), (Float64(wt), PPF::CsgWeight),
-        hanger, depth,
-        nothing, nothing, nothing, nothing,
-    )
-end
-
-# Unit singleton of a Casing diameter (`Diameter{IN}` -> `inch`, …)
-_unit(::Diameter{U}) where {U} = U()
-
-# Legacy area helper: cross-sectional area expressed in the diameter's own
-# unit squared (in² for inch casings, mm² for mm casings), so that the
-# user-supplied factor `f` of the legacy `calc_capacity(…, f)` keeps its
-# meaning. Computed through the single annulus core (`annulus_capacity`).
-function _area_in_unit2(od::Diameter, id::Real=0.0)
-    unit   = _unit(od)
-    area_m2 = annulus_capacity(od, Diameter(id, unit); out=m3_m).value
-    return area_m2 / to_m(Diameter(1.0, unit)).value^2
-end
-
-"""
-	calc_capacity(csg::Casing{T}, f::T) ::Tuple{T, T, T}
-		where T<:Union{Float64, Float32}
-
-Calculate the (3) capacties given a Casing object. Each capacity will
-be multiply by `f` conversion factor.
-
-Legacy form: areas are in the casing diameter unit squared (in² or mm²)
-and `f` is applied verbatim (`f` is required so this form never collides
-with the typed form below). Prefer the keyword form
-`calc_capacity(csg; out=bbl_ft)` which returns typed `Capacity` values.
-
-# Arguments
-- `csg::Casing{T}`: The Casing object for which to calculate the capacities.
-- `f::T`: The conversion factor to multiply each capacity by (use `1.0` for raw areas).
-
-# Returns
-- `external::T`: The external capacity of the casing.
-- `internal::T`: The internal capacity of the casing.
-- `displace::T`: The wall capacity of the casing.
-"""
-function calc_capacity(csg::Casing{T}, f::T) where {T<:Union{Float64,Float32}}
-    external = _area_in_unit2(csg.od) * f
-    internal = _area_in_unit2(csg.id) * f
-    displace = _area_in_unit2(csg.od, csg.id.value) * f
-
-    return (external=external, internal=internal, displace=displace)
+    wt = (calc_casing_weight(od, id), PPF::CsgWeight)
+    return Casing{Float64}(od, id, wt, hanger, depth, thread, grade, burst, collapse)
 end
 
 """
 	calc_capacity(csg::Casing; out::CapacityUnit=bbl_ft)
 
-Typed form: the (3) capacities of a Casing as UomDefinitions `Capacity`
-quantities in the unit `out` (`bbl_ft`, `gal_ft`, `m3_m`, `l_m`).
+The (3) capacities of a Casing as UomDefinitions `Capacity` quantities in
+the unit `out` (`bbl_ft`, `gal_ft`, `m3_m`, `l_m`).
 
 # Returns
 - `external`: [`hole_capacity`](@ref) of the OD (full circle, no washout).
@@ -230,45 +217,11 @@ function calc_capacity(csg::Casing; out::CapacityUnit=bbl_ft)
     return (external=external, internal=internal, displace=displace)
 end
 
-
-"""
-	calc_capacity(outer::Casing{T}, inner::Casing{T}, f::T)
-		where {T<:Union{Float64,Float32}}
-
-Calculate the (3) capacties given two Casing objects. Each capacity will
-be multiply by `f` conversion factor.
-
-Legacy form: areas are in the casing diameter unit squared (in² or mm²)
-and `f` is applied verbatim (`f` is required so this form never collides
-with the typed form below). Prefer the keyword form
-`calc_capacity(outer, inner; out=bbl_ft)` which returns typed `Capacity` values.
-
-# Arguments
-- `outer::Casing{T}`: The outer Casing object.
-- `inner::Casing{T}`: The inner Casing object.
-- `f::T`: The conversion factor to multiply each capacity by (use `1.0` for raw areas).
-
-# Returns
-- `annular::T`: The annular capacity between the two casings.
-- `internal::T`: The internal capacity of the inner casing.
-- `displace::T`: The displacement capacity of the inner casing.
-"""
-function calc_capacity(
-    outer::Casing{T}, inner::Casing{T},
-    f::T) where {T<:Union{Float64,Float32}}
-
-    annular = _area_in_unit2(outer.id, inner.od.value) * f
-    internal = _area_in_unit2(inner.id) * f
-    displace = _area_in_unit2(inner.od, inner.id.value) * f
-
-    return (annular=annular, internal=internal, displace=displace)
-end
-
 """
 	calc_capacity(outer::Casing, inner::Casing; out::CapacityUnit=bbl_ft)
 
-Typed form: the (3) capacities of a casing-in-casing pair as UomDefinitions
-`Capacity` quantities in the unit `out`. The two casings may use different diameter units.
+The (3) capacities of a casing-in-casing pair as UomDefinitions `Capacity`
+quantities in the unit `out`. The two casings may use different diameter units.
 
 # Returns
 - `annular`: [`annulus_capacity`](@ref) between `outer` ID and `inner` OD.
