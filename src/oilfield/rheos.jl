@@ -219,8 +219,11 @@ function fit_rheology(::Type{GeneralizedHB}, γ̇::AbstractVector, τ::AbstractV
 end
 # ---- Fann-35 helpers and legacy GHB (moved verbatim from SimuHydraulics) -----
 # Define enums for Bob, Rotor, and Spring configurations
+"Fann-35 rotor sleeves `R1`, `R2`, `R3` (shear-rate constant k₃ depends on the rotor-bob pair, see `RB_K3`)."
 @enum Rotor R1 R2 R3
+"Fann-35 bobs `B1`–`B4` (geometry factor k₂ depends on the rotor-bob pair, see `RB_K2`)."
 @enum Bob B1 B2 B3 B4
+"Fann-35 torsion springs `F0_2` … `F10` (spring constant k₁ in dyne/cm/degree, see `SPRING_K1`)."
 @enum Spring F0_2 F0_5 F1 F2 F3 F4 F5 F10
 
 const FloatNothing = Union{Missing,Nothing,Float64}
@@ -341,6 +344,13 @@ function FannRheology(
     return shear_rates, shear_stresses
 end
 
+"""
+    FannInputs(readings::FannReadings; rotor=R1, bob=B1, spring=F1, k1=nothing, k2=nothing)
+
+Fann-35 readings together with the rheometer configuration used to turn them
+into a rheogram (`FannRheology`). When both `k1` and `k2` are given they
+override the rotor-bob-spring constants.
+"""
 struct FannInputs
     readings::FannReadings
     rotor::Rotor
@@ -614,9 +624,7 @@ end
 
 
 # --------------------------------------------------------------------
-#
-# 		Plotting functions
-#
+#   Unit helper for the legacy GHB fit (μ∞ in lbf·s/100 ft² → cP)
 # --------------------------------------------------------------------
 
 """

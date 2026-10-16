@@ -15,6 +15,9 @@ UomDefinitions = "5c4bf7a8-0757-40b8-9968-47d0ead680d5"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 MakieThemes = "e296ed71-da82-5faf-88ab-0034a9761098"
 
+[sources]
+UomDefinitions = {path = "../UomDefinitions"}
+
 [extensions]
 SimuUtilsMakieExt = ["CairoMakie", "MakieThemes"]
 

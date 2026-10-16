@@ -106,3 +106,14 @@ end
         @test isdefined(SimuUtils, n)
     end
 end
+
+@testset "exports — every exported name is documented" begin
+    # Documentation is docstrings only (no Documenter site): every public name
+    # must answer `?name`. Enum members are documented through their @enum type.
+    for n in names(SimuUtils)
+        n === :SimuUtils && continue
+        v = getfield(SimuUtils, n)
+        v isa Enum && continue
+        @test haskey(Base.Docs.meta(SimuUtils), Base.Docs.Binding(SimuUtils, n))
+    end
+end

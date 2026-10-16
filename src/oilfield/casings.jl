@@ -5,11 +5,13 @@
 # ----------------------------------------
 
 # ===== Casing-weight units (UomDefinitions pattern, no conversions yet) =====
+"Unit tags for nominal casing weight (mass per length). Only `PPF` exists until UomDefinitions gains a linear-weight family."
 abstract type CsgWeightUnit <: Uom end
 
 "pounds per foot (nominal casing weight, \"ppf\")"
 struct PPF <: CsgWeightUnit end
 
+"Singleton for pounds per foot, the oilfield nominal casing weight unit."
 const ppf = PPF()
 
 """
