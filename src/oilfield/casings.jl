@@ -161,10 +161,10 @@ The inner constructor is the single validation point:
 An `id` of zero (solid bar) and `D64` diameters are accepted here; the
 capacity functions raise `ZeroCapacityError` for a zero bore.
 
-Invariants are checked at construction only. `Casing` is a `mutable struct`
-(and `Diameter` / `Length` values are mutable too), so assigning a field
-afterwards (`csg.id = Diameter(8.0, inch)`, `csg.od.value = 1.0`) bypasses
-every check above. Build a new `Casing` instead of mutating one.
+Invariants are checked at construction only. `Casing` is a `mutable struct`,
+so assigning a field afterwards (`csg.id = Diameter(8.0, inch)`) bypasses
+every check above. Build a new `Casing` instead of mutating one. (The
+`Diameter` / `Length` values themselves are immutable since UomDefinitions 0.5.)
 """
 mutable struct Casing{T<:Float64}
     od::Diameter
