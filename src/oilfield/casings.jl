@@ -53,8 +53,8 @@ end
 _unit(::Diameter{U}) where {U} = U()
 
 # A foot length expressed as a Diameter in the unit of `u`
-_as_diameter(l::Length, ::IN)  = to_in(l)
-_as_diameter(l::Length, ::MM)  = to_mm(l)
+_as_diameter(l::Length, ::IN) = to_in(l)
+_as_diameter(l::Length, ::MM) = to_mm(l)
 _as_diameter(l::Length, ::D64) = to_d64(to_in(l))
 
 # ----------------------------------------
@@ -193,11 +193,11 @@ mutable struct Casing{T<:Float64}
                 throw(ArgumentError("Hanger cannot be deeper than Casing depth"))
         end
 
-        !isnothing(burst)    && burst.value    < 0 && throw(NegativeValueError())
+        !isnothing(burst) && burst.value < 0 && throw(NegativeValueError())
         !isnothing(collapse) && collapse.value < 0 && throw(NegativeValueError())
 
         new{T}(od, id, wt, hanger, depth, thread,
-               isnothing(grade) ? nothing : String(grade), burst, collapse)
+            isnothing(grade) ? nothing : String(grade), burst, collapse)
     end
 end
 
@@ -258,7 +258,7 @@ quantities in the unit `out`. The two casings may use different diameter units.
 - `displace`: [`pipe_displacement`](@ref) of the inner steel wall.
 """
 function calc_capacity(outer::Casing, inner::Casing; out::CapacityUnit=bbl_ft)
-    annular  = annulus_capacity(outer.id, inner.od; out=out)        # units may differ
+    annular = annulus_capacity(outer.id, inner.od; out=out)        # units may differ
     internal = pipe_capacity(inner.id; out=out)
     displace = pipe_displacement(inner.od, inner.id; out=out)
 
