@@ -7,7 +7,7 @@
     FluidType
 
 Kinds of wellbore fluids used in cementing jobs. `Mud` is kept as a generic
-drilling fluid; `OBM` / `WBM` are oil- and water-based muds, `FreshWater` and
+drilling fluid; `SBM` / `OBM` / `WBM` are oil- and water-based muds, `FreshWater` and
 `SeaWater` are displacement / flush fluids.
 """
 @enum FluidType begin
@@ -15,6 +15,7 @@ drilling fluid; `OBM` / `WBM` are oil- and water-based muds, `FreshWater` and
     Spacer
     Cement
     Brine
+    SBM
     OBM
     WBM
     FreshWater

@@ -227,6 +227,79 @@ function Casing(
     return Casing{Float64}(od, id, wt, hanger, depth, thread, grade, burst, collapse)
 end
 
+# Unit singleton of a Length (`Length{FT}` -> `ft`, …), the `_unit` trick for depths
+_length_unit(::Length{U}) where {U} = U()
+
+"""
+    casing_length(csg::Casing) -> Union{Nothing,Length}
+
+Section length `depth - hanger`, returned in the unit of `depth`. Also
+reachable as the derived property `csg.length`.
+
+The `hanger` is set by the user: zero means a string hung at surface, a
+positive value a liner (or a section continuing a previous string). A
+missing `hanger` counts as surface. Returns `nothing` when `depth` is unset.
+Not a stored field, so it always reflects the current `hanger` / `depth`.
+A hanger within the constructor's tolerance of `depth` gives zero (a
+unit round-trip can leave a ~1e-13 negative residue that `Length` rejects).
+"""
+function casing_length(csg::Casing)
+    d = csg.depth
+    isnothing(d) && return nothing
+    h = isnothing(csg.hanger) ? 0.0 : to_unit(csg.hanger, _length_unit(d)).value
+    len = d.value - h
+    isapprox(len, 0.0; atol=1e-9 * max(d.value, 1.0)) && (len = 0.0)
+    return Length(len, _length_unit(d))
+end
+
+# Natural volume unit of a section from the unit of its depth: feet -> bbl, metres -> m³
+_volume_unit(::FT) = bbl
+_volume_unit(::M)  = m3
+_volume_unit(csg::Casing) = isnothing(csg.depth) ? bbl : _volume_unit(_length_unit(csg.depth))
+
+"""
+    casing_volume(csg::Casing; out::VolumeUnit=_volume_unit(csg)) -> Union{Nothing,Volume}
+
+Internal (bore) volume of the section: `pipe_capacity(id) × length`
+([`capacity_volume`](@ref) over [`casing_length`](@ref)). Also the derived
+property `csg.total_volume`. `out` defaults to `bbl` when `depth` is in feet
+and `m3` when in metres. Returns `nothing` when `depth` is unset.
+
+# Throws
+- `ZeroCapacityError` for a solid bar (`id` of zero), from [`pipe_capacity`](@ref).
+"""
+function casing_volume(csg::Casing; out::VolumeUnit=_volume_unit(csg))
+    len = casing_length(csg)
+    isnothing(len) && return nothing
+    return capacity_volume(pipe_capacity(csg.id), len; out=out)
+end
+
+"""
+    casing_displacement(csg::Casing; out::VolumeUnit=_volume_unit(csg)) -> Union{Nothing,Volume}
+
+Steel volume of the section: `pipe_displacement(od, id) × length`
+([`capacity_volume`](@ref) over [`casing_length`](@ref)). Also the derived
+property `csg.total_displacement`. `out` defaults to `bbl` when `depth` is in
+feet and `m3` when in metres. Returns `nothing` when `depth` is unset.
+"""
+function casing_displacement(csg::Casing; out::VolumeUnit=_volume_unit(csg))
+    len = casing_length(csg)
+    isnothing(len) && return nothing
+    return capacity_volume(pipe_displacement(csg.od, csg.id), len; out=out)
+end
+
+# `length`, `total_volume` and `total_displacement` are derived from the stored
+# fields (never stored themselves); every other property is a field.
+function Base.getproperty(csg::Casing, name::Symbol)
+    name === :length             && return casing_length(csg)
+    name === :total_volume       && return casing_volume(csg)
+    name === :total_displacement && return casing_displacement(csg)
+    return getfield(csg, name)
+end
+
+Base.propertynames(::Casing) =
+    (fieldnames(Casing)..., :length, :total_volume, :total_displacement)
+
 """
 	calc_capacity(csg::Casing; out::CapacityUnit=bbl_ft)
 

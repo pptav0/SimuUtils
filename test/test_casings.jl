@@ -4,6 +4,7 @@ using SimuUtils
 using UomDefinitions: Uom, Diameter, Length, Pressure, Density, PPCF, D64,
     inch, mm, d64, ft, m, psi, bar, l_m, ppcf, kg_m3, sg, to_kg_m3,
     Capacity, BBL_PER_FT, L_PER_M, to_bbl_ft, to_in, M_PER_IN, M3_PER_BBL, M_PER_FT,
+    Volume, BBL, M3, bbl, m3, ltr, to_m3,
     ZeroCapacityError, NegativeValueError, InvalidValueError, ZeroValueError
 
 const SU = SimuUtils
@@ -13,7 +14,8 @@ const SU = SimuUtils
 
 @testset "casings.jl — exports" begin
     for n in (:Casing, :CsgWeight, :CsgWeightUnit, :PPF, :ppf, :Thread,
-              :calc_casing_weight, :calc_casing_id, :STEEL_DENSITY, :calc_capacity)
+              :calc_casing_weight, :calc_casing_id, :STEEL_DENSITY, :calc_capacity,
+              :casing_length, :casing_volume, :casing_displacement)
         @test n in names(SimuUtils)
     end
 end
@@ -228,4 +230,130 @@ end
     # legacy factor forms are gone
     @test_throws MethodError calc_capacity(outer, inner, 1/808.5)
     @test_throws MethodError calc_capacity(inner, 1.0)
+end
+
+@testset "casing_length / csg.length — Normal" begin
+    od, id = Diameter(9.625, inch), Diameter(8.755, inch)
+
+    # surface hanger: length is the depth itself, in the unit of depth
+    c = Casing(od, id; hanger=Length(0.0, ft), depth=Length(3000.0, ft))
+    @test casing_length(c) isa Length{typeof(ft)}
+    @test casing_length(c).value == 3000.0
+    @test c.length === casing_length(c) || c.length.value == casing_length(c).value
+
+    # liner: hanger inside a previous string
+    l = Casing(od, id; hanger=Length(2500.0, ft), depth=Length(3000.0, ft))
+    @test l.length isa Length{typeof(ft)} && l.length.value == 500.0
+
+    # mixed units: hanger in metres, depth in feet -> result in feet
+    mx = Casing(od, id; hanger=Length(100.0, m), depth=Length(1000.0, ft))
+    @test mx.length isa Length{typeof(ft)}
+    @test mx.length.value ≈ 1000.0 - 100.0 / M_PER_FT
+
+    # metric depth keeps metres
+    mm_c = Casing(od, id; hanger=Length(200.0, m), depth=Length(1500.0, m))
+    @test mm_c.length isa Length{typeof(m)} && mm_c.length.value == 1300.0
+
+    # derived, not stored: follows a later depth assignment
+    l.depth = Length(3200.0, ft)
+    @test l.length.value == 700.0
+
+    # stored fields still reach through getproperty
+    @test c.od === od && c.hanger.value == 0.0 && c.grade === nothing
+    @test :length in propertynames(c)
+    @test :depth in propertynames(c)
+end
+
+@testset "casing_length / csg.length — Edge" begin
+    od, id = Diameter(7.0, inch), Diameter(6.276, inch)
+
+    # no hanger given: treated as surface
+    nh = Casing(od, id; depth=Length(800.0, m))
+    @test nh.length isa Length{typeof(m)} && nh.length.value == 800.0
+
+    # no depth: no length
+    nd = Casing(od, id; hanger=Length(100.0, m))
+    @test nd.length === nothing
+    @test casing_length(Casing(od, id)) === nothing
+
+    # hanger == depth: zero length
+    z = Casing(od, id; hanger=Length(500.0, ft), depth=Length(500.0, ft))
+    @test z.length.value == 0.0
+
+    # hanger within the constructor tolerance of depth (unit round-trip): clamps to zero
+    t = Casing(od, id; hanger=Length(500.0 * M_PER_FT, m), depth=Length(500.0, ft))
+    @test t.length.value == 0.0
+end
+
+@testset "casing_length / csg.length — Failure" begin
+    c = Casing(Diameter(7.0, inch), Diameter(6.276, inch);
+        hanger=Length(0.0, ft), depth=Length(500.0, ft))
+    # derived property cannot be assigned
+    @test_throws ErrorException c.length = Length(1.0, ft)
+    @test_throws MethodError casing_length(1.0)
+end
+
+@testset "casing_volume / casing_displacement — Normal" begin
+    od, id = Diameter(9.625, inch), Diameter(8.755, inch)
+
+    # ft depth -> bbl, equal to capacity × length from the geometry core
+    c = Casing(od, id; hanger=Length(0.0, ft), depth=Length(3000.0, ft))
+    len = Length(3000.0, ft)
+    @test c.total_volume isa Volume{BBL}
+    @test c.total_volume.value ≈ capacity_volume(pipe_capacity(id), len).value
+    @test c.total_displacement isa Volume{BBL}
+    @test c.total_displacement.value ≈ capacity_volume(pipe_displacement(od, id), len).value
+    @test casing_volume(c).value == c.total_volume.value
+    @test casing_displacement(c).value == c.total_displacement.value
+    # bore + steel = full OD circle
+    @test c.total_volume.value + c.total_displacement.value ≈ circle_volume(od, len).value
+
+    # m depth -> m³
+    cm = Casing(od, id; hanger=Length(0.0, m), depth=Length(1500.0, m))
+    @test cm.total_volume isa Volume{M3}
+    @test cm.total_volume.value ≈ capacity_volume(pipe_capacity(id), Length(1500.0, m); out=m3).value
+    @test cm.total_displacement isa Volume{M3}
+
+    # liner: only the hanger-to-shoe length counts
+    l = Casing(od, id; hanger=Length(2500.0, ft), depth=Length(3000.0, ft))
+    @test l.total_volume.value ≈ capacity_volume(pipe_capacity(id), Length(500.0, ft)).value
+
+    # explicit output unit on the function forms
+    @test casing_volume(c; out=m3) isa Volume{M3}
+    @test casing_volume(c; out=m3).value ≈ to_m3(c.total_volume).value
+    @test casing_displacement(cm; out=ltr).value ≈ cm.total_displacement.value * 1000.0
+
+    # derived: follows a later depth assignment
+    l.depth = Length(3500.0, ft)
+    @test l.total_volume.value ≈ capacity_volume(pipe_capacity(id), Length(1000.0, ft)).value
+
+    @test :total_volume in propertynames(c) && :total_displacement in propertynames(c)
+end
+
+@testset "casing_volume / casing_displacement — Edge" begin
+    od, id = Diameter(7.0, inch), Diameter(6.276, inch)
+
+    # no depth -> nothing
+    nd = Casing(od, id; hanger=Length(100.0, m))
+    @test nd.total_volume === nothing && nd.total_displacement === nothing
+    @test casing_volume(Casing(od, id)) === nothing
+
+    # zero length -> zero volume, still typed
+    z = Casing(od, id; hanger=Length(500.0, ft), depth=Length(500.0, ft))
+    @test z.total_volume isa Volume{BBL} && z.total_volume.value == 0.0
+    @test z.total_displacement.value == 0.0
+
+    # solid bar: steel volume exists, bore volume raises (no capacity)
+    bar = Casing(od, Diameter(0.0, inch); hanger=Length(0.0, ft), depth=Length(100.0, ft))
+    @test bar.total_displacement.value ≈ circle_volume(od, Length(100.0, ft)).value
+    @test_throws ZeroCapacityError bar.total_volume
+end
+
+@testset "casing_volume / casing_displacement — Failure" begin
+    c = Casing(Diameter(7.0, inch), Diameter(6.276, inch);
+        hanger=Length(0.0, ft), depth=Length(500.0, ft))
+    @test_throws ErrorException c.total_volume = Volume(1.0, bbl)
+    @test_throws ErrorException c.total_displacement = Volume(1.0, bbl)
+    @test_throws MethodError casing_volume(1.0)
+    @test_throws MethodError casing_displacement(1.0)
 end
